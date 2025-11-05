@@ -1,0 +1,32 @@
+# Python / venv
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Build / Dist
+build/
+dist/
+*.egg-info/
+
+# Coverage / Reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Project data artifacts (not tracked)
+runs/
+data/
+*.pt
+*.onnx
+
