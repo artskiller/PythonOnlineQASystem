@@ -53,7 +53,7 @@ def flatten(xs: Iterable[Any]) -> Iterator[Any]:
     """扁平化嵌套的 list/tuple，其他类型原样输出"""
     for x in xs:
         if isinstance(x, (list, tuple)):
-            ____ flatten(x)  # 填空：yield from
+            yield from flatten(x)  # 填空：yield from
         else:
             yield x
 
@@ -107,4 +107,3 @@ def _run_self_tests():
 
 if __name__ == "__main__":
     _run_self_tests()
-

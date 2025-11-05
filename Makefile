@@ -1,38 +1,110 @@
-# 简易 Makefile：本地/CI 快捷运行
+# Python 学习项目 Makefile
 # 使用方式：
-#   make install          # 安装依赖（仅 B/E 需要）
-#   make answers          # 运行答案版自检
-#   make blank            # 运行空白版自检
-#   make both             # 先空白后答案
-#   make run MODE=blank   # 自定义模式（answers|blank|both）
+#   make setup            # 初始化项目（创建虚拟环境、安装依赖、组织文件）
+#   make install          # 安装依赖
+#   make learn LEVEL=01   # 启动交互式学习
+#   make progress         # 查看学习进度
+#   make test             # 运行所有测试
+#   make clean            # 清理临时文件
 
 SHELL := /bin/bash
-PY ?= python
+PY ?= python3
+VENV := .venv
 RUNNER := interview_exercises/run_all.py
 MODE ?= answers
+LEVEL ?= 01
 
-.PHONY: help install run answers blank both
+.PHONY: help setup install organize learn progress test answers blank both clean
 
 help:
-	@echo "可用目标："
-	@echo "  make install          安装依赖（pandas/numpy）"
-	@echo "  make answers          运行答案版自检"
-	@echo "  make blank            运行空白版自检"
-	@echo "  make both             先空白后答案"
-	@echo "  make run MODE=blank   指定模式运行（answers|blank|both）"
+	@echo "🎓 Python 学习项目 - 可用命令："
+	@echo ""
+	@echo "  📦 环境设置："
+	@echo "    make setup            初始化项目（推荐首次使用）"
+	@echo "    make install          安装依赖（pandas/numpy）"
+	@echo "    make organize         组织练习文件到分级目录"
+	@echo ""
+	@echo "  📚 学习工具："
+	@echo "    make learn LEVEL=01   启动交互式学习（指定阶段）"
+	@echo "    make progress         查看学习进度"
+	@echo "    make stats            查看详细统计"
+	@echo ""
+	@echo "  🧪 测试运行："
+	@echo "    make test             运行所有测试"
+	@echo "    make answers          运行答案版自检"
+	@echo "    make blank            运行空白版自检"
+	@echo ""
+	@echo "  🧹 清理："
+	@echo "    make clean            清理临时文件"
+	@echo ""
+	@echo "  💡 快速开始："
+	@echo "    1. make setup         # 首次使用"
+	@echo "    2. make learn         # 开始学习"
+	@echo "    3. make progress      # 查看进度"
 
+# 初始化项目
+setup:
+	@echo "🔧 初始化项目..."
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "📦 创建虚拟环境..."; \
+		$(PY) -m venv $(VENV); \
+	fi
+	@echo "📥 安装依赖..."
+	@$(VENV)/bin/pip install -U pip
+	@$(VENV)/bin/pip install -r requirements.txt
+	@echo "📁 组织练习文件..."
+	@bash scripts/organize_exercises.sh
+	@echo ""
+	@echo "✅ 项目初始化完成！"
+	@echo ""
+	@echo "💡 下一步："
+	@echo "  1. 激活虚拟环境：source $(VENV)/bin/activate"
+	@echo "  2. 开始学习：make learn"
+	@echo "  3. 查看进度：make progress"
+
+# 安装依赖
 install:
 	$(PY) -m pip install -r requirements.txt
 
+# 组织练习文件
+organize:
+	@bash scripts/organize_exercises.sh
+
+# 交互式学习
+learn:
+	@$(PY) learn.py --level $(LEVEL)
+
+# 查看进度
+progress:
+	@$(PY) progress.py --show
+
+# 详细统计
+stats:
+	@$(PY) progress.py --stats
+
+# 运行测试
 run:
 	$(PY) $(RUNNER) --mode $(MODE)
 
+test: answers
+
+# 运行答案版
 answers:
 	$(PY) $(RUNNER) --mode answers
 
+# 运行空白版
 blank:
 	$(PY) $(RUNNER) --mode blank
 
+# 先空白后答案
 both:
 	$(PY) $(RUNNER) --mode both
 
+# 清理临时文件
+clean:
+	@echo "🧹 清理临时文件..."
+	@find . -type f -name "*.pyc" -delete
+	@find . -type d -name "__pycache__" -delete
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@rm -f .learning_progress.json
+	@echo "✅ 清理完成！"
