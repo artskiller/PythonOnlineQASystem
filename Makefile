@@ -14,10 +14,15 @@ RUNNER := interview_exercises/run_all.py
 MODE ?= answers
 LEVEL ?= 01
 
-.PHONY: help setup install organize learn progress test answers blank both clean
+.PHONY: help setup install organize learn progress test answers blank both clean web web-install web-docker
 
 help:
 	@echo "🎓 Python 学习项目 - 可用命令："
+	@echo ""
+	@echo "  🌐 Web学习平台（推荐）："
+	@echo "    make web              启动Web学习平台"
+	@echo "    make web-install      安装Web依赖"
+	@echo "    make web-docker       使用Docker运行Web平台"
 	@echo ""
 	@echo "  📦 环境设置："
 	@echo "    make setup            初始化项目（推荐首次使用）"
@@ -38,9 +43,10 @@ help:
 	@echo "    make clean            清理临时文件"
 	@echo ""
 	@echo "  💡 快速开始："
-	@echo "    1. make setup         # 首次使用"
-	@echo "    2. make learn         # 开始学习"
-	@echo "    3. make progress      # 查看进度"
+	@echo "    1. make web           # Web学习平台（推荐）"
+	@echo "    2. make setup         # 命令行模式"
+	@echo "    3. make learn         # 开始学习"
+	@echo "    4. make progress      # 查看进度"
 
 # 初始化项目
 setup:
@@ -99,6 +105,25 @@ blank:
 # 先空白后答案
 both:
 	$(PY) $(RUNNER) --mode both
+
+# Web学习平台
+web-install:
+	@echo "📦 安装Web依赖..."
+	@$(PY) -m pip install -r requirements-web.txt
+	@echo "✅ Web依赖安装完成！"
+
+web: web-install
+	@echo "🌐 启动Web学习平台..."
+	@echo "📖 访问地址: http://localhost:5000"
+	@echo "💡 按 Ctrl+C 停止服务"
+	@echo ""
+	@$(PY) web_app.py
+
+web-docker:
+	@echo "🐳 使用Docker启动Web平台..."
+	@docker-compose up -d
+	@echo "✅ Web平台已启动！"
+	@echo "📖 访问地址: http://localhost:5000"
 
 # 清理临时文件
 clean:

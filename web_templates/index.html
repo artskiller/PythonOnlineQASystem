@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 交互式学习平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>🐍 Python学习</h1>
+                <p>交互式编程练习</p>
+            </div>
+            
+            <div class="filters">
+                <h3>筛选</h3>
+                <select id="categoryFilter" class="filter-select">
+                    <option value="">全部分类</option>
+                    <option value="AI">AI专项</option>
+                    <option value="基础">基础入门</option>
+                    <option value="数据">数据处理</option>
+                    <option value="算法">算法思维</option>
+                    <option value="并发">并发编程</option>
+                    <option value="业务">业务应用</option>
+                </select>
+                
+                <select id="difficultyFilter" class="filter-select">
+                    <option value="">全部难度</option>
+                    <option value="⭐">简单</option>
+                    <option value="⭐⭐">中等</option>
+                    <option value="⭐⭐⭐">困难</option>
+                </select>
+            </div>
+            
+            <div class="question-list" id="questionList">
+                <div class="loading">加载中...</div>
+            </div>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 欢迎页 -->
+            <div id="welcomePage" class="welcome-page">
+                <h1>🎉 欢迎来到 Python 交互式学习平台</h1>
+                <p class="subtitle">系统化学习 Python，从基础到 AI 工程师</p>
+                
+                <div class="features">
+                    <div class="feature-card">
+                        <div class="feature-icon">📝</div>
+                        <h3>在线编程</h3>
+                        <p>实时编写和测试代码</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>即时反馈</h3>
+                        <p>自动测试，立即查看结果</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>分级练习</h3>
+                        <p>31套题目，从入门到精通</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🤖</div>
+                        <h3>AI专项</h3>
+                        <p>机器学习、NLP、OCR实战</p>
+                    </div>
+                </div>
+                
+                <div class="quick-start">
+                    <h2>🚀 快速开始</h2>
+                    <ol>
+                        <li>从左侧选择一个题目</li>
+                        <li>在代码编辑器中填写代码</li>
+                        <li>点击"运行测试"查看结果</li>
+                        <li>需要帮助？点击"查看提示"</li>
+                    </ol>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-number">31</div>
+                        <div class="stat-label">套题目</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">93</div>
+                        <div class="stat-label">个文件</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">200+</div>
+                        <div class="stat-label">个函数</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 题目页 -->
+            <div id="questionPage" class="question-page" style="display: none;">
+                <div class="question-header">
+                    <div class="question-title">
+                        <h2 id="questionTitle">题目标题</h2>
+                        <div class="question-meta">
+                            <span class="badge" id="questionCategory">分类</span>
+                            <span class="badge" id="questionDifficulty">难度</span>
+                            <span class="badge" id="questionTime">时间</span>
+                        </div>
+                    </div>
+                    
+                    <div class="question-actions">
+                        <button class="btn btn-secondary" id="showHintBtn">💡 查看提示</button>
+                        <button class="btn btn-secondary" id="showAnswerBtn">📖 查看答案</button>
+                        <button class="btn btn-secondary" id="resetCodeBtn">🔄 重置代码</button>
+                        <button class="btn btn-primary" id="runCodeBtn">▶️ 运行测试</button>
+                    </div>
+                </div>
+                
+                <div class="editor-container">
+                    <div class="editor-header">
+                        <span>📝 代码编辑器</span>
+                        <span class="editor-info" id="editorInfo">Python 3.8+</span>
+                    </div>
+                    <textarea id="codeEditor"></textarea>
+                </div>
+                
+                <div class="output-container">
+                    <div class="output-header">
+                        <span>📊 测试结果</span>
+                        <button class="btn-clear" id="clearOutputBtn">清空</button>
+                    </div>
+                    <div class="output-content" id="outputContent">
+                        <div class="output-placeholder">运行代码后，测试结果将显示在这里</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+

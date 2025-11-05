@@ -16,7 +16,15 @@
 
 ## 🎉 项目更新
 
-> **最新消息（2025-11-05）**：项目已完成学习友好化改造 + 面试准备增强 + **AI技能专项增强**！
+> **最新消息（2025-11-05）**：项目已完成学习友好化改造 + 面试准备增强 + AI技能专项增强 + **Web交互式学习平台**！
+>
+> **🌐 Web学习平台**（🔥 最新）：
+> - ✅ **在线编程环境** - 浏览器中直接编写和运行Python代码
+> - ✅ **现代化UI** - 深色主题，代码高亮，实时反馈
+> - ✅ **智能提示系统** - 提供学习建议和答案参考
+> - ✅ **进度可视化** - 直观展示学习进度
+> - ✅ **一键启动** - `python web_app.py` 即可使用
+> - 📖 查看 [Web应用指南](WEB_APP_GUIDE.md)
 >
 > **学习系统**：
 > - ✅ 新增 8 个阶段的系统化学习路径
@@ -25,20 +33,18 @@
 > - ✅ 新增完整的文档体系（15500+ 字）
 > - ✅ 新增分级目录结构（84 个符号链接）
 >
-> **面试准备**（🔥 新增）：
+> **面试准备**：
 > - ✅ 面试模拟器（`interview_simulator.py`）- 2小时限时练习
 > - ✅ 面试准备度分析（`INTERVIEW_READINESS_ANALYSIS.md`）
 > - ✅ 7天冲刺指南（`INTERVIEW_SPRINT_GUIDE.md`）
 > - ✅ 财税知识速查卡（`TAX_CHEATSHEET.md`）
 >
-> **AI技能增强**（⭐ 最新）：
+> **AI技能增强**：
 > - ✅ 机器学习基础套题（`set_ML1`）- 特征工程/模型训练/评估
 > - ✅ NLP基础套题（`set_NLP1`）- 中文分词/TF-IDF/文本分类
 > - ✅ OCR实战套题（`set_OCR1`）- 图像预处理/字段提取/批量识别
 > - ✅ AI技能速查卡（`AI_CHEATSHEET.md`）
 > - ✅ AI技能缺口分析（`AI_SKILLS_GAP_ANALYSIS.md`）
->
-> 查看 [AI技能增强总结](AI_ENHANCEMENT_SUMMARY.md) 了解详情
 
 ---
 
@@ -99,13 +105,32 @@ pip install -r requirements.txt
 
 ### 3. 开始学习（选择一种方式）
 
-##### 方式 A：交互式学习（推荐新手）
+#### 🌐 方式 A：Web交互式学习（⭐ 强烈推荐）
+
+```bash
+# 安装Web依赖
+pip install -r requirements-web.txt
+
+# 启动Web服务
+python web_app.py
+
+# 浏览器访问 http://localhost:5000
+```
+
+**特点**：
+- ✅ 现代化图形界面，无需命令行
+- ✅ 在线代码编辑器，语法高亮
+- ✅ 实时运行测试，即时反馈
+- ✅ 智能提示和答案参考
+- 📖 详见 [Web应用指南](WEB_APP_GUIDE.md)
+
+#### 💻 方式 B：命令行交互式学习（推荐新手）
 
 ```bash
 python learn.py --level 01
 ```
 
-#### 方式 B：直接练习（推荐有经验者）
+#### 📝 方式 C：直接练习（推荐有经验者）
 
 ```bash
 # 编辑空白版
@@ -115,7 +140,7 @@ vim exercises/01_basics/set_A_blank.py
 python exercises/01_basics/set_A_blank.py
 ```
 
-#### 方式 C：AI技能专项练习（推荐AI工程师）
+#### 🤖 方式 D：AI技能专项练习（推荐AI工程师）
 
 ```bash
 # 机器学习基础
@@ -129,7 +154,7 @@ python set_NLP1_blank.py
 python set_OCR1_blank.py
 ```
 
-#### 方式 D：查看答案学习（推荐复习）
+#### 📖 方式 E：查看答案学习（推荐复习）
 
 ```bash
 # 查看带注释的答案

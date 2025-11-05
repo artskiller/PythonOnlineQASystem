@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./interview_exercises:/app/interview_exercises:ro
+      - ./web_templates:/app/web_templates:ro
+      - ./web_static:/app/web_static:ro
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+
