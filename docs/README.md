@@ -52,6 +52,13 @@ Web学习平台使用指南：
 - **[演示文档](web-platform/WEB_APP_DEMO.md)** - 快速体验指南
 - **[平台总结](web-platform/WEB_PLATFORM_SUMMARY.md)** - 技术细节
 
+### 🔒 [安全文档](SECURITY.md)
+
+Web平台安全说明：
+
+- **[安全说明](SECURITY.md)** - 完整的安全架构和防护措施
+- **[安全修复总结](SECURITY_FIX_SUMMARY.md)** - 任意代码执行漏洞修复详情
+
 <div align="center">
   <img src="images/web-platform-screenshot.png" alt="Web学习平台" width="80%">
   <p><i>💡 查看 <a href="web-platform/WEB_APP_GUIDE.md">Web应用指南</a> 了解更多</i></p>
