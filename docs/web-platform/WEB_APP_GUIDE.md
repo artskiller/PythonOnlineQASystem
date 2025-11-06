@@ -4,6 +4,11 @@
 
 这是一个**基于Web的交互式Python学习平台**，提供了友好的图形界面，让您可以在浏览器中直接编写、运行和测试Python代码。
 
+<div align="center">
+  <img src="../images/web-platform-screenshot.png" alt="Web学习平台界面" width="100%">
+  <p><i>Web交互式学习平台界面预览</i></p>
+</div>
+
 ### ✨ 核心特性
 
 - 🎨 **现代化UI** - 深色主题，护眼舒适

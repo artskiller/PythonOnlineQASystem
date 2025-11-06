@@ -2,6 +2,11 @@
 
 基于Flask的交互式Python学习平台，提供在线代码编辑、实时执行和即时反馈。
 
+<div align="center">
+  <img src="../docs/images/web-platform-screenshot.png" alt="Web学习平台界面" width="100%">
+  <p><i>现代化的在线编程环境 - 支持实时代码编辑、测试和反馈</i></p>
+</div>
+
 ---
 
 ## 🚀 快速开始

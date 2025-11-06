@@ -125,6 +125,13 @@ cd web && python app.py
 - ✅ 智能提示和答案参考
 - 📖 详见 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [Web平台文档](web/README.md)
 
+**界面预览**：
+
+<div align="center">
+  <img src="docs/images/web-platform-screenshot.png" alt="Web学习平台界面" width="100%">
+  <p><i>Web交互式学习平台 - 现代化的在线编程环境</i></p>
+</div>
+
 #### 💻 方式 B：命令行交互式学习（推荐新手）
 
 ```bash
