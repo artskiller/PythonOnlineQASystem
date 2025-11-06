@@ -58,6 +58,15 @@ Web平台安全说明：
 
 - **[安全说明](SECURITY.md)** - 完整的安全架构和防护措施
 - **[安全修复总结](SECURITY_FIX_SUMMARY.md)** - 任意代码执行漏洞修复详情
+- **[安全检查清单](SECURITY_CHECKLIST.md)** - 部署和维护检查清单
+
+### 🌍 [跨平台兼容性](PLATFORM_COMPATIBILITY.md)
+
+不同操作系统的支持说明：
+
+- **[平台兼容性指南](PLATFORM_COMPATIBILITY.md)** - Linux/macOS/Windows支持详情
+- **[Windows用户指南](WINDOWS_GUIDE.md)** - Windows平台专用指南
+- **[修复方案](PLATFORM_FIX_PLAN.md)** - 跨平台兼容性修复计划
 
 <div align="center">
   <img src="images/web-platform-screenshot.png" alt="Web学习平台" width="80%">

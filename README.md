@@ -81,6 +81,16 @@
 
 ## 🚀 快速开始
 
+### 系统要求
+
+| 平台 | 支持状态 | 说明 |
+|------|---------|------|
+| **Linux** | ✅ 完全支持 | 推荐生产环境 |
+| **macOS** | ✅ 完全支持 | 推荐开发环境 |
+| **Windows** | ⚠️ 部分支持 | 推荐使用WSL2，详见 [Windows指南](docs/WINDOWS_GUIDE.md) |
+
+> **📖 平台兼容性**: [完整说明](docs/PLATFORM_COMPATIBILITY.md) | [Windows指南](docs/WINDOWS_GUIDE.md)
+
 ### 1. 克隆项目
 
 ```bash
@@ -91,15 +101,16 @@ cd pythonLearn
 ### 2. 环境设置（2 分钟）
 
 ```bash
-# 创建虚拟环境
+# 方式A: 使用setup.py（推荐，跨平台）
+python setup.py setup
+
+# 方式B: 使用Makefile（Linux/macOS）
+make setup
+
+# 方式C: 手动安装
 python3 -m venv .venv
-
-# 激活虚拟环境
 source .venv/bin/activate  # macOS/Linux
-# 或
 .venv\Scripts\activate     # Windows
-
-# 安装依赖
 pip install -r requirements.txt
 ```
 
@@ -108,7 +119,10 @@ pip install -r requirements.txt
 #### 🌐 方式 A：Web交互式学习（⭐ 强烈推荐）
 
 ```bash
-# 一键启动（自动安装依赖）
+# 使用setup.py（所有平台）
+python setup.py web
+
+# 或使用Makefile（Linux/macOS）
 make web
 
 # 或手动启动
@@ -123,8 +137,8 @@ cd web && python app.py
 - ✅ 在线代码编辑器，语法高亮
 - ✅ 实时运行测试，即时反馈
 - ✅ 智能提示和答案参考
-- � **安全沙箱保护** - 多层安全防护，防止恶意代码
-- �📖 详见 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [安全说明](docs/SECURITY.md)
+- 🔒 **安全沙箱保护** - 多层安全防护，防止恶意代码
+- 📖 详见 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [安全说明](docs/SECURITY.md)
 
 **界面预览**：
 

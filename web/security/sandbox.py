@@ -2,16 +2,29 @@
 """
 安全沙箱模块 - 限制代码执行权限
 使用RestrictedPython和资源限制来防止恶意代码执行
+
+跨平台支持:
+- Linux: 完整的资源限制 (RLIMIT)
+- macOS: 部分资源限制
+- Windows: 仅超时保护
 """
 
 import sys
 import ast
-import resource
-import signal
+import platform
 import multiprocessing
+import warnings
 from typing import Dict, Any, Tuple
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
+
+# 平台特定导入
+if sys.platform != 'win32':
+    import resource
+    import signal
+else:
+    resource = None
+    signal = None
 
 
 class SecurityError(Exception):
@@ -56,6 +69,17 @@ class CodeSandbox:
     
     def __init__(self):
         self.violations = []
+        self.platform = sys.platform
+
+        # Windows平台警告
+        if self.platform == 'win32':
+            warnings.warn(
+                "⚠️  Windows平台不支持完整的资源限制（内存、CPU）。\n"
+                "   建议使用WSL2或Linux环境以获得完整的安全保护。\n"
+                "   当前仅提供: 超时保护、输出限制、代码检查。",
+                RuntimeWarning,
+                stacklevel=2
+            )
     
     def check_imports(self, code: str) -> bool:
         """检查导入语句是否安全"""
@@ -111,21 +135,42 @@ class CodeSandbox:
         return len(self.violations) == 0
     
     def set_resource_limits(self):
-        """设置资源限制（仅Unix系统）"""
-        if sys.platform != 'win32':
+        """
+        设置资源限制（平台相关）
+
+        - Linux: 完整的RLIMIT支持
+        - macOS: 部分RLIMIT支持（某些限制可能被忽略）
+        - Windows: 不支持（跳过）
+        """
+        if sys.platform == 'win32':
+            # Windows不支持resource模块
+            return
+
+        if resource is None:
+            return
+
+        try:
+            # 限制内存（Linux完全支持，macOS可能部分支持）
             try:
-                # 限制内存
                 resource.setrlimit(
                     resource.RLIMIT_AS,
                     (self.MAX_MEMORY_MB * 1024 * 1024, self.MAX_MEMORY_MB * 1024 * 1024)
                 )
-                # 限制CPU时间
-                resource.setrlimit(
-                    resource.RLIMIT_CPU,
-                    (self.MAX_CPU_TIME, self.MAX_CPU_TIME)
-                )
-            except Exception:
-                pass  # Windows不支持resource模块
+            except (ValueError, OSError) as e:
+                # macOS可能不支持RLIMIT_AS
+                if sys.platform == 'darwin':
+                    pass  # macOS: 忽略内存限制错误
+                else:
+                    raise
+
+            # 限制CPU时间（Unix系统都支持）
+            resource.setrlimit(
+                resource.RLIMIT_CPU,
+                (self.MAX_CPU_TIME, self.MAX_CPU_TIME)
+            )
+        except Exception as e:
+            # 降级处理：即使资源限制失败，仍然依赖超时机制
+            pass
     
     def execute_safe(self, code: str, timeout: int = 10) -> Dict[str, Any]:
         """
@@ -183,13 +228,19 @@ class CodeSandbox:
             }
 
     def _run_in_process(self, code: str, queue: multiprocessing.Queue):
-        """在独立进程中执行代码"""
+        """
+        在独立进程中执行代码
+
+        平台差异:
+        - Unix: 使用SIGALRM信号超时
+        - Windows: 依赖multiprocessing的超时机制
+        """
         try:
-            # 设置资源限制
+            # 设置资源限制（Unix系统）
             self.set_resource_limits()
 
-            # 设置超时信号（仅Unix）
-            if sys.platform != 'win32':
+            # 设置超时信号（仅Unix系统）
+            if sys.platform != 'win32' and signal is not None:
                 signal.signal(signal.SIGALRM, self._timeout_handler)
                 signal.alarm(self.MAX_CPU_TIME)
 
@@ -238,8 +289,33 @@ class CodeSandbox:
             })
 
     def _timeout_handler(self, signum, frame):
-        """超时处理器"""
+        """超时处理器（仅Unix系统使用）"""
         raise TimeoutError("CPU时间超限")
+
+    def get_platform_info(self) -> Dict[str, Any]:
+        """
+        获取平台信息和安全能力
+
+        Returns:
+            平台信息字典
+        """
+        capabilities = {
+            'platform': sys.platform,
+            'platform_name': platform.system(),
+            'python_version': sys.version.split()[0],
+            'multiprocessing': True,
+            'timeout': True,
+            'output_limit': True,
+            'ast_check': True,
+            'resource_limit': False,
+            'signal_timeout': False,
+        }
+
+        if sys.platform != 'win32':
+            capabilities['resource_limit'] = resource is not None
+            capabilities['signal_timeout'] = signal is not None
+
+        return capabilities
 
     def _get_safe_builtins(self) -> dict:
         """获取安全的内置函数"""
