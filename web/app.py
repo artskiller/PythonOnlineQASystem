@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Python学习平台 - Web应用后端
-提供交互式学习界面和实时代码执行
+提供交互式学习界面和实时代码执行（安全沙箱模式）
 """
 
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -9,12 +9,21 @@ from flask_cors import CORS
 import os
 import sys
 import json
-import subprocess
-import tempfile
 import traceback
 from pathlib import Path
 from typing import Dict, List, Any
 import re
+
+# 导入安全模块
+try:
+    from security.sandbox import sandbox, SecurityError
+    from security.rate_limiter import rate_limiter
+    SANDBOX_ENABLED = True
+except ImportError:
+    SANDBOX_ENABLED = False
+    rate_limiter = None
+    print("⚠️  警告: 安全沙箱未启用，代码执行存在风险！")
+    print("   请运行: pip install -r web/requirements.txt")
 
 app = Flask(__name__,
             static_folder='static',
@@ -159,53 +168,66 @@ def extract_functions(code: str) -> List[Dict[str, str]]:
 
 @app.route('/api/run', methods=['POST'])
 def run_code():
-    """执行代码并返回结果"""
+    """执行代码并返回结果（安全沙箱模式）"""
+    # 1. 速率限制检查
+    if rate_limiter:
+        client_ip = request.remote_addr or 'unknown'
+        allowed, reason = rate_limiter.is_allowed(client_ip)
+        if not allowed:
+            return jsonify({
+                "success": False,
+                "error": reason,
+                "rate_limit": True
+            }), 429
+
     data = request.json
     code = data.get('code', '')
-    
+
     if not code:
         return jsonify({"error": "代码不能为空"}), 400
-    
-    # 创建临时文件
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
-        f.write(code)
-        temp_file = f.name
-    
-    try:
-        # 执行代码（设置超时）
-        result = subprocess.run(
-            [sys.executable, temp_file],
-            capture_output=True,
-            text=True,
-            timeout=30,  # 30秒超时
-            cwd=str(EXERCISES_DIR)
-        )
-        
-        return jsonify({
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode
-        })
-    
-    except subprocess.TimeoutExpired:
+
+    # 2. 代码长度限制
+    if len(code) > 50000:  # 50KB
         return jsonify({
             "success": False,
-            "error": "代码执行超时（超过30秒）"
-        }), 408
-    
+            "error": "代码长度超过限制（最大50KB）"
+        }), 400
+
+    try:
+        if SANDBOX_ENABLED:
+            # 使用安全沙箱执行
+            result = sandbox.execute_safe(code, timeout=10)
+
+            # 如果有安全违规，返回详细信息
+            if not result.get("success") and "violations" in result:
+                return jsonify({
+                    "success": False,
+                    "error": result.get("error"),
+                    "violations": result.get("violations"),
+                    "security_warning": "代码包含不安全的操作，已被阻止"
+                }), 403
+
+            return jsonify(result)
+
+        else:
+            # 降级模式：使用基本的subprocess执行（不推荐）
+            return jsonify({
+                "success": False,
+                "error": "安全沙箱未启用，代码执行已禁用",
+                "warning": "请联系管理员启用安全沙箱"
+            }), 503
+
+    except SecurityError as e:
+        return jsonify({
+            "success": False,
+            "error": f"安全检查失败: {str(e)}"
+        }), 403
+
     except Exception as e:
         return jsonify({
             "success": False,
             "error": f"执行错误: {str(e)}"
         }), 500
-    
-    finally:
-        # 清理临时文件
-        try:
-            os.unlink(temp_file)
-        except:
-            pass
 
 
 if __name__ == '__main__':

@@ -123,7 +123,8 @@ cd web && python app.py
 - ✅ 在线代码编辑器，语法高亮
 - ✅ 实时运行测试，即时反馈
 - ✅ 智能提示和答案参考
-- 📖 详见 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [Web平台文档](web/README.md)
+- � **安全沙箱保护** - 多层安全防护，防止恶意代码
+- �📖 详见 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [安全说明](docs/SECURITY.md)
 
 **界面预览**：
 
