@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-[🚀 开始使用](GETTING_STARTED.md) • [快速开始](QUICK_START.md) • [学习路径](LEARNING_PATH.md) • [知识图谱](KNOWLEDGE_MAP.md) • [常见问题](FAQ.md)
+[🚀 开始使用](docs/getting-started/GETTING_STARTED.md) • [快速开始](docs/getting-started/QUICK_START.md) • [学习路径](docs/learning/LEARNING_PATH.md) • [知识图谱](docs/learning/KNOWLEDGE_MAP.md) • [常见问题](docs/getting-started/FAQ.md) • [📚 文档中心](docs/)
 
 </div>
 
@@ -23,8 +23,8 @@
 > - ✅ **现代化UI** - 深色主题，代码高亮，实时反馈
 > - ✅ **智能提示系统** - 提供学习建议和答案参考
 > - ✅ **进度可视化** - 直观展示学习进度
-> - ✅ **一键启动** - `python web_app.py` 即可使用
-> - 📖 查看 [Web应用指南](WEB_APP_GUIDE.md)
+> - ✅ **一键启动** - `make web` 即可使用
+> - 📖 查看 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [Web平台文档](web/README.md)
 >
 > **学习系统**：
 > - ✅ 新增 8 个阶段的系统化学习路径
@@ -34,17 +34,17 @@
 > - ✅ 新增分级目录结构（84 个符号链接）
 >
 > **面试准备**：
-> - ✅ 面试模拟器（`interview_simulator.py`）- 2小时限时练习
-> - ✅ 面试准备度分析（`INTERVIEW_READINESS_ANALYSIS.md`）
-> - ✅ 7天冲刺指南（`INTERVIEW_SPRINT_GUIDE.md`）
-> - ✅ 财税知识速查卡（`TAX_CHEATSHEET.md`）
+> - ✅ 面试模拟器（`tools/interview_simulator.py`）- 2小时限时练习
+> - ✅ 面试准备度分析（[查看文档](docs/interview/INTERVIEW_READINESS_ANALYSIS.md)）
+> - ✅ 7天冲刺指南（[查看文档](docs/interview/INTERVIEW_SPRINT_GUIDE.md)）
+> - ✅ 财税知识速查卡（[查看文档](docs/cheatsheets/TAX_CHEATSHEET.md)）
 >
 > **AI技能增强**：
 > - ✅ 机器学习基础套题（`set_ML1`）- 特征工程/模型训练/评估
 > - ✅ NLP基础套题（`set_NLP1`）- 中文分词/TF-IDF/文本分类
 > - ✅ OCR实战套题（`set_OCR1`）- 图像预处理/字段提取/批量识别
-> - ✅ AI技能速查卡（`AI_CHEATSHEET.md`）
-> - ✅ AI技能缺口分析（`AI_SKILLS_GAP_ANALYSIS.md`）
+> - ✅ AI技能速查卡（[查看文档](docs/cheatsheets/AI_CHEATSHEET.md)）
+> - ✅ AI技能缺口分析（[查看文档](docs/ai-enhancement/AI_SKILLS_GAP_ANALYSIS.md)）
 
 ---
 
@@ -108,13 +108,14 @@ pip install -r requirements.txt
 #### 🌐 方式 A：Web交互式学习（⭐ 强烈推荐）
 
 ```bash
-# 安装Web依赖
-pip install -r requirements-web.txt
+# 一键启动（自动安装依赖）
+make web
 
-# 启动Web服务
-python web_app.py
+# 或手动启动
+pip install -r web/requirements.txt
+cd web && python app.py
 
-# 浏览器访问 http://localhost:5000
+# 浏览器访问 http://localhost:8080
 ```
 
 **特点**：
@@ -122,12 +123,16 @@ python web_app.py
 - ✅ 在线代码编辑器，语法高亮
 - ✅ 实时运行测试，即时反馈
 - ✅ 智能提示和答案参考
-- 📖 详见 [Web应用指南](WEB_APP_GUIDE.md)
+- 📖 详见 [Web应用指南](docs/web-platform/WEB_APP_GUIDE.md) | [Web平台文档](web/README.md)
 
 #### 💻 方式 B：命令行交互式学习（推荐新手）
 
 ```bash
-python learn.py --level 01
+# 使用Makefile
+make learn LEVEL=01
+
+# 或直接运行
+python tools/learn.py --level 01
 ```
 
 #### 📝 方式 C：直接练习（推荐有经验者）
@@ -164,10 +169,14 @@ cat exercises/01_basics/set_A_answers_annotated.py
 ### 4. 查看进度
 
 ```bash
-python progress.py --show
+# 使用Makefile
+make progress
+
+# 或直接运行
+python tools/progress.py --show
 ```
 
-**详细指南**：查看 [快速开始文档](QUICK_START.md)
+**详细指南**：查看 [快速开始文档](docs/getting-started/QUICK_START.md)
 
 ---
 
@@ -209,7 +218,7 @@ A (基础) → B (pandas) → C (算法) → D (并发) → P (日志) → Z (�
 
 **算法工程师**：`A → C → I → O → D → H → T`
 
-**详细路径**：查看 [学习路径文档](LEARNING_PATH.md)
+**详细路径**：查看 [学习路径文档](docs/learning/LEARNING_PATH.md)
 
 ---
 
@@ -257,7 +266,7 @@ A (基础) → B (pandas) → C (算法) → D (并发) → P (日志) → Z (�
 
 </details>
 
-**完整知识图谱**：查看 [知识图谱文档](KNOWLEDGE_MAP.md)
+**完整知识图谱**：查看 [知识图谱文档](docs/learning/KNOWLEDGE_MAP.md)
 
 ---
 
@@ -266,30 +275,50 @@ A (基础) → B (pandas) → C (算法) → D (并发) → P (日志) → Z (�
 ```
 pythonLearn/
 ├── README.md                    # 项目总览（本文件）
-├── QUICK_START.md              # 快速开始指南
-├── LEARNING_PATH.md            # 详细学习路径
-├── KNOWLEDGE_MAP.md            # 知识图谱
-├── FAQ.md                      # 常见问题解答
-├── requirements.txt            # 依赖列表
-├── learn.py                    # 交互式学习工具（即将推出）
-├── progress.py                 # 进度追踪工具（即将推出）
+├── LICENSE                      # 开源许可证
+├── Makefile                     # 构建和运行命令
+├── requirements.txt             # 核心依赖
 │
-├── exercises/                  # 练习题目录（即将重组）
-│   ├── 01_basics/             # 第1阶段：基础入门
-│   ├── 02_data/               # 第2阶段：数据处理
-│   ├── 03_algorithm/          # 第3阶段：算法思维
-│   ├── 04_concurrency/        # 第4阶段：并发编程
-│   ├── 05_engineering/        # 第5阶段：工程实践
-│   ├── 06_business/           # 第6阶段：业务应用
-│   ├── 07_system/             # 第7阶段：系统设计
-│   └── 08_projects/           # 第8阶段：综合项目
+├── docs/                        # 📚 文档中心
+│   ├── README.md               # 文档导航
+│   ├── getting-started/        # 入门指南
+│   ├── learning/               # 学习资源
+│   ├── interview/              # 面试准备
+│   ├── cheatsheets/            # 速查表
+│   ├── ai-enhancement/         # AI增强文档
+│   └── web-platform/           # Web平台文档
 │
-└── interview_exercises/        # 原始题目（保留兼容）
-    ├── README.md
-    ├── set_A_blank.py
-    ├── set_A_answers.py
-    ├── set_A_answers_annotated.py
-    └── ...
+├── tools/                       # 🛠️ 工具脚本
+│   ├── README.md               # 工具说明
+│   ├── learn.py                # 交互式学习工具
+│   ├── progress.py             # 进度追踪工具
+│   └── interview_simulator.py  # 面试模拟器
+│
+├── web/                         # 🌐 Web学习平台
+│   ├── README.md               # Web应用说明
+│   ├── app.py                  # Flask应用
+│   ├── requirements.txt        # Web依赖
+│   ├── templates/              # HTML模板
+│   ├── static/                 # 静态资源（CSS/JS）
+│   └── docker/                 # Docker配置
+│
+├── interview_exercises/         # 📝 练习题目（原始）
+│   ├── QUESTION_BANK.md
+│   ├── set_*.py               # 31套题 × 3版本
+│   └── ...
+│
+├── exercises/                   # 📂 分级练习（符号链接）
+│   ├── stage_01_basics/       # 第1阶段：基础入门
+│   ├── stage_02_data/         # 第2阶段：数据处理
+│   ├── stage_03_algorithm/    # 第3阶段：算法思维
+│   ├── stage_04_concurrency/  # 第4阶段：并发编程
+│   ├── stage_05_engineering/  # 第5阶段：工程实践
+│   ├── stage_06_business/     # 第6阶段：业务应用
+│   ├── stage_07_system/       # 第7阶段：系统设计
+│   └── stage_08_projects/     # 第8阶段：综合项目
+│
+└── scripts/                     # 🔧 构建脚本
+    └── organize_exercises.sh
 ```
 
 ---
@@ -313,11 +342,11 @@ pythonLearn/
 ### 遇到困难时
 
 ```bash
-# 1. 获取提示
-python learn.py --hint --question A1
+# 1. 使用Web平台的智能提示
+make web
 
 # 2. 查看 FAQ
-cat FAQ.md
+cat docs/getting-started/FAQ.md
 
 # 3. 查看知识图谱
 cat KNOWLEDGE_MAP.md

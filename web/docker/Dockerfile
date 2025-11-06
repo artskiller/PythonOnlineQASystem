@@ -11,21 +11,24 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
-COPY requirements-web.txt .
+COPY web/requirements.txt /app/web/requirements.txt
 
 # 安装Python依赖
-RUN pip install --no-cache-dir -r requirements-web.txt
+RUN pip install --no-cache-dir -r /app/web/requirements.txt
 
 # 复制项目文件
 COPY . .
 
+# 设置工作目录为web应用
+WORKDIR /app/web
+
 # 暴露端口
-EXPOSE 5000
+EXPOSE 8080
 
 # 设置环境变量
-ENV FLASK_APP=web_app.py
+ENV PORT=8080
 ENV FLASK_ENV=production
 
 # 启动命令
-CMD ["python", "web_app.py"]
+CMD ["python", "app.py"]
 

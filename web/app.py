@@ -16,13 +16,13 @@ from pathlib import Path
 from typing import Dict, List, Any
 import re
 
-app = Flask(__name__, 
-            static_folder='web_static',
-            template_folder='web_templates')
+app = Flask(__name__,
+            static_folder='static',
+            template_folder='templates')
 CORS(app)
 
 # 项目根目录
-ROOT_DIR = Path(__file__).parent
+ROOT_DIR = Path(__file__).parent.parent  # web/ -> pythonLearn/
 EXERCISES_DIR = ROOT_DIR / "interview_exercises"
 
 # 题目元数据
@@ -67,7 +67,7 @@ def index():
 @app.route('/static/<path:path>')
 def send_static(path):
     """静态文件服务"""
-    return send_from_directory('web_static', path)
+    return send_from_directory('static', path)
 
 
 @app.route('/api/questions')

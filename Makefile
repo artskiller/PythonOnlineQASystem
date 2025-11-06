@@ -78,15 +78,15 @@ organize:
 
 # 交互式学习
 learn:
-	@$(PY) learn.py --level $(LEVEL)
+	@$(PY) tools/learn.py --level $(LEVEL)
 
 # 查看进度
 progress:
-	@$(PY) progress.py --show
+	@$(PY) tools/progress.py --show
 
 # 详细统计
 stats:
-	@$(PY) progress.py --stats
+	@$(PY) tools/progress.py --stats
 
 # 运行测试
 run:
@@ -109,21 +109,21 @@ both:
 # Web学习平台
 web-install:
 	@echo "📦 安装Web依赖..."
-	@$(PY) -m pip install -r requirements-web.txt
+	@$(PY) -m pip install -r web/requirements.txt
 	@echo "✅ Web依赖安装完成！"
 
 web: web-install
 	@echo "🌐 启动Web学习平台..."
-	@echo "📖 访问地址: http://localhost:5000"
+	@echo "📖 访问地址: http://localhost:8080"
 	@echo "💡 按 Ctrl+C 停止服务"
 	@echo ""
-	@$(PY) web_app.py
+	@cd web && $(PY) app.py
 
 web-docker:
 	@echo "🐳 使用Docker启动Web平台..."
-	@docker-compose up -d
+	@cd web/docker && docker-compose up -d
 	@echo "✅ Web平台已启动！"
-	@echo "📖 访问地址: http://localhost:5000"
+	@echo "📖 访问地址: http://localhost:8080"
 
 # 清理临时文件
 clean:
