@@ -72,9 +72,16 @@ Web平台安全说明：
 
 项目后期功能规划和发展路线：
 
+**通用规划**（适合公网大规模部署）:
 - **[功能路线图](FUTURE_ROADMAP.md)** - 6个月功能规划，优先级矩阵
-- **[架构演进](ARCHITECTURE_EVOLUTION.md)** - 从V1.0到V2.0的技术架构演进
+- **[架构演进](ARCHITECTURE_EVOLUTION.md)** - 从V1.0到V2.0的技术架构演进（PostgreSQL + Redis）
 - **[项目规划看板](PROJECT_PLANNING.md)** - 详细的Sprint规划和里程碑
+
+**单机/局域网版**（推荐，500人以内）:
+- **[架构演进V2](ARCHITECTURE_EVOLUTION_V2.md)** - SQLite + Vue.js + Docker方案
+- **[简化版路线图](ROADMAP_SIMPLIFIED.md)** - 3个月开发计划，快速上线
+
+**技术选型**: SQLite（数据库）+ Vue.js（前端）+ Docker（部署）
 
 <div align="center">
   <img src="images/web-platform-screenshot.png" alt="Web学习平台" width="80%">
