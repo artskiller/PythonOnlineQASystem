@@ -68,6 +68,14 @@ Web平台安全说明：
 - **[Windows用户指南](WINDOWS_GUIDE.md)** - Windows平台专用指南
 - **[修复方案](PLATFORM_FIX_PLAN.md)** - 跨平台兼容性修复计划
 
+### 🚀 [项目规划](FUTURE_ROADMAP.md)
+
+项目后期功能规划和发展路线：
+
+- **[功能路线图](FUTURE_ROADMAP.md)** - 6个月功能规划，优先级矩阵
+- **[架构演进](ARCHITECTURE_EVOLUTION.md)** - 从V1.0到V2.0的技术架构演进
+- **[项目规划看板](PROJECT_PLANNING.md)** - 详细的Sprint规划和里程碑
+
 <div align="center">
   <img src="images/web-platform-screenshot.png" alt="Web学习平台" width="80%">
   <p><i>💡 查看 <a href="web-platform/WEB_APP_GUIDE.md">Web应用指南</a> 了解更多</i></p>
