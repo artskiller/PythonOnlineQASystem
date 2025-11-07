@@ -15,6 +15,7 @@
 |------|------|--------|---------|--------|
 | V1.0 | 2025-11-07 | 开发团队 | 初始版本 | - |
 | V2.0 | 2025-11-07 | 开发团队 | 添加V2.0架构设计 | - |
+| V3.0 | 2025-11-07 | 开发团队 | 结合商用系统经验完善设计 | - |
 
 ---
 
@@ -26,7 +27,9 @@
 4. [数据库设计](#4-数据库设计)
 5. [接口设计](#5-接口设计)
 6. [安全设计](#6-安全设计)
-7. [部署设计](#7-部署设计)
+7. [性能设计](#7-性能设计)
+8. [部署设计](#8-部署设计)
+9. [运维设计](#9-运维设计)
 
 ---
 
@@ -1582,9 +1585,313 @@ def upload_file():
 
 ---
 
-## 7. 部署设计
+## 7. 性能设计
 
-### 7.1 Docker容器化部署
+### 7.1 缓存策略
+
+#### 7.1.1 应用层缓存
+
+**内存缓存（LRU Cache）**:
+```python
+from functools import lru_cache
+from cachetools import TTLCache
+
+# 题目列表缓存（5分钟）
+question_cache = TTLCache(maxsize=100, ttl=300)
+
+@lru_cache(maxsize=128)
+def get_question_by_id(question_id):
+    """获取题目详情（带缓存）"""
+    if question_id in question_cache:
+        return question_cache[question_id]
+
+    question = Question.query.get(question_id)
+    question_cache[question_id] = question
+    return question
+
+# 用户信息缓存（10分钟）
+user_cache = TTLCache(maxsize=500, ttl=600)
+
+def get_user_by_id(user_id):
+    """获取用户信息（带缓存）"""
+    if user_id in user_cache:
+        return user_cache[user_id]
+
+    user = User.query.get(user_id)
+    user_cache[user_id] = user
+    return user
+```
+
+**缓存失效策略**:
+- 题目更新时清除题目缓存
+- 用户信息更新时清除用户缓存
+- 排行榜每5分钟更新一次
+- 学习进度实时更新，不缓存
+
+#### 7.1.2 数据库查询优化
+
+**索引优化**:
+```sql
+-- 用户表索引
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
+
+-- 题目表索引
+CREATE INDEX idx_questions_category ON questions(category);
+CREATE INDEX idx_questions_difficulty ON questions(difficulty);
+CREATE INDEX idx_questions_type ON questions(type);
+
+-- 提交表索引
+CREATE INDEX idx_submissions_user_id ON submissions(user_id);
+CREATE INDEX idx_submissions_question_id ON submissions(question_id);
+CREATE INDEX idx_submissions_submitted_at ON submissions(submitted_at);
+CREATE INDEX idx_submissions_user_question ON submissions(user_id, question_id);
+
+-- 进度表索引
+CREATE INDEX idx_progress_user_id ON progress(user_id);
+CREATE INDEX idx_progress_user_status ON progress(user_id, status);
+```
+
+**查询优化**:
+```python
+# ❌ 避免N+1查询
+users = User.query.all()
+for user in users:
+    submissions = user.submissions  # 每次都查询数据库
+
+# ✅ 使用join预加载
+from sqlalchemy.orm import joinedload
+
+users = User.query.options(
+    joinedload(User.submissions)
+).all()
+
+# ✅ 只查询需要的字段
+users = db.session.query(
+    User.id,
+    User.username,
+    User.level
+).all()
+
+# ✅ 使用分页
+from flask_sqlalchemy import Pagination
+
+page = request.args.get('page', 1, type=int)
+per_page = 20
+
+pagination = Question.query.paginate(
+    page=page,
+    per_page=per_page,
+    error_out=False
+)
+```
+
+### 7.2 异步处理
+
+#### 7.2.1 代码执行异步化
+
+**使用线程池**:
+```python
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
+# 创建线程池
+executor = ThreadPoolExecutor(max_workers=10)
+
+def execute_code_async(submission_id, code, test_cases):
+    """异步执行代码"""
+    def run():
+        try:
+            result = executor_service.execute(code, test_cases)
+
+            # 更新提交记录
+            submission = Submission.query.get(submission_id)
+            submission.result = result
+            submission.success = result['success']
+            submission.score = result['score']
+            db.session.commit()
+
+        except Exception as e:
+            logger.error(f'代码执行失败: {e}')
+
+    # 提交到线程池
+    executor.submit(run)
+
+@app.route('/api/v1/submissions', methods=['POST'])
+def submit_code():
+    data = request.json
+
+    # 创建提交记录
+    submission = Submission(
+        user_id=get_jwt_identity(),
+        question_id=data['question_id'],
+        code=data['code'],
+        status='pending'
+    )
+    db.session.add(submission)
+    db.session.commit()
+
+    # 异步执行
+    execute_code_async(submission.id, data['code'], test_cases)
+
+    return {
+        'submission_id': submission.id,
+        'status': 'pending'
+    }
+```
+
+#### 7.2.2 后台任务
+
+**定时任务**:
+```python
+from apscheduler.schedulers.background import BackgroundScheduler
+
+scheduler = BackgroundScheduler()
+
+# 每日备份任务
+@scheduler.scheduled_job('cron', hour=2, minute=0)
+def daily_backup():
+    """每日凌晨2点备份数据库"""
+    backup_database()
+
+# 每小时清理过期数据
+@scheduler.scheduled_job('cron', minute=0)
+def hourly_cleanup():
+    """每小时清理过期数据"""
+    cleanup_expired_data()
+
+# 每5分钟更新排行榜
+@scheduler.scheduled_job('interval', minutes=5)
+def update_leaderboard():
+    """更新排行榜"""
+    calculate_leaderboard()
+
+scheduler.start()
+```
+
+### 7.3 数据库连接池
+
+**SQLAlchemy连接池配置**:
+```python
+from sqlalchemy.pool import QueuePool
+
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'poolclass': QueuePool,
+    'pool_size': 10,          # 连接池大小
+    'pool_recycle': 3600,     # 连接回收时间（秒）
+    'pool_pre_ping': True,    # 连接前检查
+    'max_overflow': 20,       # 最大溢出连接数
+    'pool_timeout': 30        # 获取连接超时时间
+}
+```
+
+### 7.4 前端性能优化
+
+#### 7.4.1 代码分割
+
+**Vue Router懒加载**:
+```javascript
+const routes = [
+  {
+    path: '/',
+    component: () => import('./views/Home.vue')
+  },
+  {
+    path: '/questions',
+    component: () => import('./views/QuestionList.vue')
+  },
+  {
+    path: '/questions/:id',
+    component: () => import('./views/QuestionDetail.vue')
+  }
+]
+```
+
+#### 7.4.2 资源优化
+
+**Vite构建优化**:
+```javascript
+// vite.config.js
+export default {
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['vue', 'vue-router', 'pinia'],
+          'editor': ['codemirror'],
+          'charts': ['chart.js']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 500,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
+  }
+}
+```
+
+#### 7.4.3 图片优化
+
+- 使用WebP格式
+- 图片懒加载
+- 响应式图片
+- CDN加速
+
+### 7.5 API性能优化
+
+#### 7.5.1 响应压缩
+
+```python
+from flask_compress import Compress
+
+compress = Compress()
+compress.init_app(app)
+
+app.config['COMPRESS_MIMETYPES'] = [
+    'text/html',
+    'text/css',
+    'text/javascript',
+    'application/json'
+]
+app.config['COMPRESS_LEVEL'] = 6
+app.config['COMPRESS_MIN_SIZE'] = 500
+```
+
+#### 7.5.2 请求限流
+
+```python
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+@app.route('/api/v1/submissions', methods=['POST'])
+@limiter.limit("10 per minute")
+def submit_code():
+    """提交代码（限流：每分钟10次）"""
+    pass
+
+@app.route('/api/v1/questions')
+@limiter.limit("100 per minute")
+def get_questions():
+    """获取题目列表（限流：每分钟100次）"""
+    pass
+```
+
+---
+
+## 8. 部署设计
+
+### 8.1 Docker容器化部署
 
 #### 7.1.1 目录结构
 
@@ -1949,6 +2256,427 @@ def health_check():
             'status': 'unhealthy',
             'error': str(e)
         }, 500
+```
+
+---
+
+## 9. 运维设计
+
+### 9.1 监控系统
+
+#### 9.1.1 系统监控
+
+**监控指标**:
+```python
+from prometheus_client import Counter, Histogram, Gauge
+import psutil
+
+# 请求计数器
+request_count = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+# 响应时间直方图
+request_duration = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration',
+    ['method', 'endpoint']
+)
+
+# 系统资源监控
+cpu_usage = Gauge('system_cpu_usage', 'CPU usage percentage')
+memory_usage = Gauge('system_memory_usage', 'Memory usage percentage')
+disk_usage = Gauge('system_disk_usage', 'Disk usage percentage')
+
+def update_system_metrics():
+    """更新系统指标"""
+    cpu_usage.set(psutil.cpu_percent())
+    memory_usage.set(psutil.virtual_memory().percent)
+    disk_usage.set(psutil.disk_usage('/').percent)
+
+# 定时更新
+scheduler.add_job(update_system_metrics, 'interval', seconds=30)
+```
+
+**监控端点**:
+```python
+from prometheus_client import generate_latest
+
+@app.route('/metrics')
+def metrics():
+    """Prometheus监控端点"""
+    return generate_latest()
+```
+
+#### 9.1.2 业务监控
+
+**关键业务指标**:
+```python
+# 用户指标
+user_register_count = Counter('user_register_total', 'Total user registrations')
+user_login_count = Counter('user_login_total', 'Total user logins')
+active_users = Gauge('active_users', 'Current active users')
+
+# 学习指标
+question_submit_count = Counter('question_submit_total', 'Total question submissions')
+question_pass_count = Counter('question_pass_total', 'Total question passes')
+question_pass_rate = Gauge('question_pass_rate', 'Question pass rate')
+
+# 代码执行指标
+code_execution_count = Counter('code_execution_total', 'Total code executions')
+code_execution_duration = Histogram(
+    'code_execution_duration_seconds',
+    'Code execution duration'
+)
+code_execution_errors = Counter('code_execution_errors_total', 'Total code execution errors')
+```
+
+### 9.2 告警系统
+
+#### 9.2.1 告警规则
+
+**告警配置**:
+```yaml
+# alerts.yml
+groups:
+  - name: system_alerts
+    rules:
+      # CPU使用率告警
+      - alert: HighCPUUsage
+        expr: system_cpu_usage > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率过高"
+          description: "CPU使用率超过80%，当前值: {{ $value }}%"
+
+      # 内存使用率告警
+      - alert: HighMemoryUsage
+        expr: system_memory_usage > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高"
+          description: "内存使用率超过80%，当前值: {{ $value }}%"
+
+      # 磁盘空间告警
+      - alert: LowDiskSpace
+        expr: system_disk_usage > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘空间不足"
+          description: "磁盘使用率超过90%，当前值: {{ $value }}%"
+
+      # API响应时间告警
+      - alert: SlowAPIResponse
+        expr: http_request_duration_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API响应时间过长"
+          description: "API响应时间超过2秒"
+
+      # 错误率告警
+      - alert: HighErrorRate
+        expr: rate(code_execution_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "代码执行错误率过高"
+          description: "代码执行错误率超过5%"
+```
+
+#### 9.2.2 告警通知
+
+**邮件通知**:
+```python
+import smtplib
+from email.mime.text import MIMEText
+
+def send_alert_email(subject, content, recipients):
+    """发送告警邮件"""
+    msg = MIMEText(content, 'html', 'utf-8')
+    msg['Subject'] = subject
+    msg['From'] = 'alert@pythonlearn.com'
+    msg['To'] = ', '.join(recipients)
+
+    try:
+        smtp = smtplib.SMTP('smtp.example.com', 587)
+        smtp.starttls()
+        smtp.login('alert@pythonlearn.com', 'password')
+        smtp.send_message(msg)
+        smtp.quit()
+        logger.info(f'告警邮件已发送: {subject}')
+    except Exception as e:
+        logger.error(f'发送告警邮件失败: {e}')
+```
+
+### 9.3 日志管理
+
+#### 9.3.1 日志分类
+
+**日志级别和用途**:
+```python
+import logging
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+
+# 访问日志
+access_logger = logging.getLogger('access')
+access_handler = TimedRotatingFileHandler(
+    'logs/access.log',
+    when='midnight',
+    interval=1,
+    backupCount=30
+)
+access_logger.addHandler(access_handler)
+
+# 错误日志
+error_logger = logging.getLogger('error')
+error_handler = RotatingFileHandler(
+    'logs/error.log',
+    maxBytes=10*1024*1024,
+    backupCount=10
+)
+error_logger.addHandler(error_handler)
+
+# 业务日志
+business_logger = logging.getLogger('business')
+business_handler = RotatingFileHandler(
+    'logs/business.log',
+    maxBytes=10*1024*1024,
+    backupCount=10
+)
+business_logger.addHandler(business_handler)
+
+# 安全日志
+security_logger = logging.getLogger('security')
+security_handler = RotatingFileHandler(
+    'logs/security.log',
+    maxBytes=10*1024*1024,
+    backupCount=30
+)
+security_logger.addHandler(security_handler)
+```
+
+#### 9.3.2 结构化日志
+
+```python
+import json
+from datetime import datetime
+
+def log_structured(logger, level, event, **kwargs):
+    """记录结构化日志"""
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'level': level,
+        'event': event,
+        **kwargs
+    }
+
+    logger.log(
+        getattr(logging, level),
+        json.dumps(log_entry, ensure_ascii=False)
+    )
+
+# 使用示例
+log_structured(
+    business_logger,
+    'INFO',
+    'user_login',
+    user_id=123,
+    username='zhangsan',
+    ip='192.168.1.100'
+)
+
+log_structured(
+    security_logger,
+    'WARNING',
+    'login_failed',
+    username='admin',
+    ip='192.168.1.200',
+    reason='invalid_password'
+)
+```
+
+### 9.4 故障处理
+
+#### 9.4.1 故障分类
+
+| 故障级别 | 响应时间 | 处理流程 |
+|---------|---------|---------|
+| P0 - 紧急 | 15分钟 | 立即处理，通知所有相关人员 |
+| P1 - 高 | 1小时 | 优先处理，通知负责人 |
+| P2 - 中 | 4小时 | 正常处理，记录问题 |
+| P3 - 低 | 1天 | 计划处理，定期回顾 |
+
+#### 9.4.2 故障处理流程
+
+**故障响应流程**:
+```
+1. 故障发现
+   ↓
+2. 故障确认
+   ↓
+3. 影响评估
+   ↓
+4. 应急处理
+   ↓
+5. 根因分析
+   ↓
+6. 永久修复
+   ↓
+7. 复盘总结
+```
+
+**故障处理脚本**:
+```bash
+#!/bin/bash
+# emergency_restart.sh - 紧急重启脚本
+
+echo "🚨 开始紧急重启..."
+
+# 1. 备份当前状态
+echo "📦 备份当前数据..."
+./backup.sh
+
+# 2. 停止服务
+echo "⏸️  停止服务..."
+docker-compose down
+
+# 3. 清理临时文件
+echo "🧹 清理临时文件..."
+rm -rf /tmp/pythonlearn/*
+
+# 4. 启动服务
+echo "▶️  启动服务..."
+docker-compose up -d
+
+# 5. 健康检查
+echo "🔍 健康检查..."
+sleep 10
+curl -f http://localhost/api/v1/health || exit 1
+
+echo "✅ 重启完成"
+```
+
+### 9.5 容量规划
+
+#### 9.5.1 资源需求预测
+
+**当前资源使用**（500用户）:
+- CPU: 2核，平均使用率30%
+- 内存: 4GB，平均使用率50%
+- 磁盘: 20GB，使用10GB
+- 网络: 10Mbps，平均流量2Mbps
+
+**1年后预测**（1000用户）:
+- CPU: 4核
+- 内存: 8GB
+- 磁盘: 50GB
+- 网络: 20Mbps
+
+#### 9.5.2 扩容策略
+
+**垂直扩容**（单机性能不足时）:
+1. 增加CPU核心数
+2. 增加内存容量
+3. 升级磁盘（SSD）
+4. 增加网络带宽
+
+**水平扩容**（需要高可用时）:
+1. 部署多个后端实例
+2. 使用Nginx负载均衡
+3. 数据库读写分离
+4. 使用Redis缓存
+
+### 9.6 灾难恢复
+
+#### 9.6.1 备份策略
+
+**备份类型**:
+- **全量备份**: 每周日凌晨2点
+- **增量备份**: 每天凌晨2点
+- **实时备份**: 关键操作实时备份
+
+**备份内容**:
+- 数据库文件
+- 题目文件
+- 配置文件
+- 日志文件
+
+**备份验证**:
+```bash
+#!/bin/bash
+# verify_backup.sh - 验证备份文件
+
+BACKUP_FILE=$1
+
+echo "🔍 验证备份文件: $BACKUP_FILE"
+
+# 1. 检查文件存在
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "❌ 备份文件不存在"
+    exit 1
+fi
+
+# 2. 检查文件大小
+SIZE=$(stat -f%z "$BACKUP_FILE")
+if [ $SIZE -lt 1000000 ]; then
+    echo "❌ 备份文件过小"
+    exit 1
+fi
+
+# 3. 尝试解压
+tar -tzf "$BACKUP_FILE" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ 备份文件损坏"
+    exit 1
+fi
+
+echo "✅ 备份文件验证通过"
+```
+
+#### 9.6.2 恢复流程
+
+**数据恢复步骤**:
+```bash
+#!/bin/bash
+# restore.sh - 数据恢复脚本
+
+BACKUP_FILE=$1
+
+echo "🔄 开始数据恢复..."
+
+# 1. 停止服务
+echo "⏸️  停止服务..."
+docker-compose down
+
+# 2. 备份当前数据
+echo "📦 备份当前数据..."
+mv data data.old.$(date +%Y%m%d_%H%M%S)
+
+# 3. 解压备份文件
+echo "📂 解压备份文件..."
+tar -xzf "$BACKUP_FILE" -C .
+
+# 4. 启动服务
+echo "▶️  启动服务..."
+docker-compose up -d
+
+# 5. 验证数据
+echo "🔍 验证数据..."
+sleep 10
+python verify_data.py
+
+echo "✅ 数据恢复完成"
 ```
 
 ---
