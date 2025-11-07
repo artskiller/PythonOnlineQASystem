@@ -2444,36 +2444,212 @@ pythonLearn通过以下创新功能解决上述痛点：
 | **个人信息** | 查看/编辑个人信息 | P1 | 信息保存成功 |
 | **角色管理** | 学生/教师/管理员 | P0 | 角色权限正确 |
 
+**详细规格说明**:
+
+**1. 用户注册**:
+
+*输入字段*:
+- 邮箱（必填）：
+  - 格式：符合RFC 5322标准
+  - 长度：5-100字符
+  - 唯一性：系统内唯一
+  - 验证：实时验证邮箱格式和唯一性
+- 密码（必填）：
+  - 长度：8-32字符
+  - 复杂度：至少包含大写字母、小写字母、数字、特殊字符中的3种
+  - 强度：实时显示密码强度（弱/中/强）
+  - 确认密码：必须与密码一致
+- 用户名（必填）：
+  - 长度：2-20字符
+  - 字符：支持中文、英文、数字、下划线
+  - 唯一性：系统内唯一
+- 角色（必填）：
+  - 选项：学生/教师
+  - 默认：学生
+  - 说明：管理员角色由系统管理员手动分配
+- 验证码（可选）：
+  - 类型：图形验证码（4位数字+字母）
+  - 有效期：5分钟
+  - 用途：防止机器人注册
+
+*业务规则*:
+- 同一邮箱只能注册一次
+- 同一IP地址1小时内最多注册3个账号
+- 注册成功后自动登录，跳转到新手引导页
+- 注册成功后发送欢迎邮件
+
+*交互流程*:
+```
+1. 用户访问注册页面
+2. 用户填写注册信息
+3. 系统实时验证邮箱格式和唯一性
+4. 系统实时验证密码强度
+5. 用户点击"注册"按钮
+6. 系统验证所有字段
+7. 系统创建用户账号（密码BCrypt加密）
+8. 系统生成JWT Token
+9. 系统发送欢迎邮件（异步）
+10. 系统跳转到新手引导页
+```
+
+*错误处理*:
+- 邮箱已存在：提示"该邮箱已被注册，请直接登录或使用其他邮箱"
+- 密码强度不足：提示"密码强度不足，请包含大写字母、小写字母、数字、特殊字符中的至少3种"
+- 用户名已存在：提示"该用户名已被使用，请更换用户名"
+- 验证码错误：提示"验证码错误，请重新输入"
+- 网络错误：提示"网络错误，请稍后重试"
+
+**2. 用户登录**:
+
+*输入字段*:
+- 邮箱（必填）：
+  - 格式：符合RFC 5322标准
+  - 长度：5-100字符
+- 密码（必填）：
+  - 长度：8-32字符
+- 记住我（可选）：
+  - 类型：复选框
+  - 说明：勾选后Token有效期延长至7天
+
+*业务规则*:
+- 登录失败5次后锁定账号30分钟
+- 锁定期间显示剩余时间
+- 登录成功后记录登录日志（IP、时间、设备）
+- 支持单点登录（同一账号同时只能在一个设备登录）
+
+*交互流程*:
+```
+1. 用户访问登录页面
+2. 用户填写邮箱和密码
+3. 用户点击"登录"按钮
+4. 系统验证邮箱和密码
+5. 系统检查账号是否被锁定
+6. 系统生成JWT Token
+7. 系统记录登录日志
+8. 系统跳转到首页
+```
+
+*错误处理*:
+- 邮箱不存在：提示"该邮箱未注册，请先注册"
+- 密码错误：提示"密码错误，您还有X次尝试机会"
+- 账号被锁定：提示"账号已被锁定，请X分钟后再试"
+- 网络错误：提示"网络错误，请稍后重试"
+
+**3. 忘记密码**:
+
+*输入字段*:
+- 邮箱（必填）：
+  - 格式：符合RFC 5322标准
+  - 长度：5-100字符
+
+*业务规则*:
+- 发送重置密码邮件到注册邮箱
+- 重置链接有效期：1小时
+- 同一邮箱1小时内最多发送3次重置邮件
+- 重置密码后，所有已登录设备自动登出
+
+*交互流程*:
+```
+1. 用户点击"忘记密码"
+2. 用户输入注册邮箱
+3. 用户点击"发送重置邮件"
+4. 系统验证邮箱是否存在
+5. 系统生成重置Token
+6. 系统发送重置邮件（包含重置链接）
+7. 用户点击邮件中的重置链接
+8. 用户输入新密码
+9. 系统验证Token有效性
+10. 系统更新密码
+11. 系统登出所有已登录设备
+12. 系统跳转到登录页
+```
+
 **数据模型**:
 
 ```python
 class User:
     id: int  # 主键
-    email: str  # 邮箱（唯一）
-    password_hash: str  # 密码哈希（BCrypt）
-    username: str  # 用户名
+    email: str  # 邮箱（唯一，索引）
+    password_hash: str  # 密码哈希（BCrypt cost=12）
+    username: str  # 用户名（唯一，索引）
     role: str  # 角色（student/teacher/admin）
-    avatar: str  # 头像URL
+    avatar: str  # 头像URL（默认：/static/avatars/default.png）
+    is_active: bool  # 是否激活（默认：True）
+    is_locked: bool  # 是否锁定（默认：False）
+    locked_until: datetime  # 锁定截止时间
+    login_attempts: int  # 登录尝试次数（默认：0）
+    last_login_at: datetime  # 最后登录时间
+    last_login_ip: str  # 最后登录IP
     created_at: datetime  # 创建时间
     updated_at: datetime  # 更新时间
+
+class LoginLog:
+    id: int  # 主键
+    user_id: int  # 用户ID（外键）
+    ip: str  # 登录IP
+    user_agent: str  # 用户代理
+    status: str  # 状态（success/failed）
+    created_at: datetime  # 创建时间
+
+class PasswordResetToken:
+    id: int  # 主键
+    user_id: int  # 用户ID（外键）
+    token: str  # 重置Token（UUID）
+    expires_at: datetime  # 过期时间
+    is_used: bool  # 是否已使用（默认：False）
+    created_at: datetime  # 创建时间
 ```
 
 **API接口**:
 
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 注册 | POST | /api/auth/register | 注册新用户 |
-| 登录 | POST | /api/auth/login | 用户登录 |
-| 登出 | POST | /api/auth/logout | 用户登出 |
-| 获取个人信息 | GET | /api/users/me | 获取当前用户信息 |
-| 更新个人信息 | PUT | /api/users/me | 更新当前用户信息 |
+| 接口 | 方法 | 路径 | 请求参数 | 响应数据 | 状态码 |
+|------|------|------|---------|---------|--------|
+| 注册 | POST | /api/auth/register | email, password, username, role | user, token | 201 |
+| 登录 | POST | /api/auth/login | email, password, remember_me | user, token | 200 |
+| 登出 | POST | /api/auth/logout | - | message | 200 |
+| 获取个人信息 | GET | /api/users/me | - | user | 200 |
+| 更新个人信息 | PUT | /api/users/me | username, avatar | user | 200 |
+| 发送重置邮件 | POST | /api/auth/forgot-password | email | message | 200 |
+| 重置密码 | POST | /api/auth/reset-password | token, password | message | 200 |
+| 检查邮箱唯一性 | GET | /api/auth/check-email | email | available | 200 |
+| 检查用户名唯一性 | GET | /api/auth/check-username | username | available | 200 |
+
+**API请求示例**:
+
+```json
+// POST /api/auth/register
+{
+  "email": "student@example.com",
+  "password": "Password123!",
+  "username": "张三",
+  "role": "student"
+}
+
+// 响应
+{
+  "user": {
+    "id": 1,
+    "email": "student@example.com",
+    "username": "张三",
+    "role": "student",
+    "avatar": "/static/avatars/default.png",
+    "created_at": "2025-11-07T10:00:00Z"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
 
 **验收标准**:
 - ✅ 注册成功率 >95%
 - ✅ 登录响应时间 <200ms
 - ✅ 密码加密强度 BCrypt cost=12
-- ✅ JWT Token有效期 24小时
+- ✅ JWT Token有效期 24小时（记住我：7天）
 - ✅ 登录失败5次锁定30分钟
+- ✅ 邮箱格式验证准确率 100%
+- ✅ 密码强度验证准确率 100%
+- ✅ 重置密码邮件发送成功率 >99%
+- ✅ 支持并发注册 >50
+- ✅ 支持并发登录 >100
 
 #### F2. 在线代码编辑器
 
@@ -2493,18 +2669,169 @@ class User:
 | **代码折叠** | 折叠/展开代码块 | P1 | 函数、类可折叠 |
 | **括号匹配** | 括号自动匹配 | P1 | 输入左括号自动补全右括号 |
 | **快捷键** | 常用快捷键 | P1 | Ctrl+S保存，Ctrl+/注释 |
+| **行号显示** | 显示行号 | P0 | 行号显示正确 |
+| **代码缩进** | 自动缩进 | P0 | Tab键缩进4空格 |
+| **撤销/重做** | 撤销/重做操作 | P0 | Ctrl+Z撤销，Ctrl+Y重做 |
+
+**详细规格说明**:
+
+**1. 语法高亮**:
+
+*高亮规则*:
+- **关键字**（蓝色）：if, else, elif, for, while, def, class, import, from, return, try, except, finally, with, as, pass, break, continue, yield, lambda, and, or, not, in, is, True, False, None
+- **字符串**（绿色）：单引号、双引号、三引号字符串
+- **注释**（灰色）：# 单行注释，''' 或 """ 多行注释
+- **数字**（橙色）：整数、浮点数、科学计数法
+- **函数名**（黄色）：函数定义和调用
+- **类名**（紫色）：类定义和实例化
+- **内置函数**（青色）：print, len, range, input, int, str, list, dict, set, tuple等
+- **运算符**（黑色）：+, -, *, /, //, %, **, ==, !=, <, >, <=, >=, =, +=, -=等
+- **括号**（黑色）：(), [], {}
+
+*性能要求*:
+- 1000行代码高亮渲染时间 <100ms
+- 10000行代码高亮渲染时间 <500ms
+- 支持实时高亮（输入时即时更新）
+
+**2. 自动补全**:
+
+*补全类型*:
+- **关键字补全**：输入关键字前缀，显示匹配的关键字
+  - 示例：输入"de"，提示"def"
+- **内置函数补全**：输入内置函数前缀，显示匹配的内置函数
+  - 示例：输入"pr"，提示"print"
+- **变量补全**：输入变量前缀，显示当前作用域内的变量
+  - 示例：输入"us"，提示"username"
+- **函数补全**：输入函数前缀，显示当前文件内的函数
+  - 示例：输入"cal"，提示"calculate"
+- **模块补全**：输入模块前缀，显示常用模块
+  - 示例：输入"im"，提示"import"
+
+*补全触发*:
+- 自动触发：输入2个字符后自动显示补全列表
+- 手动触发：按Ctrl+Space显示补全列表
+- 补全列表最多显示10个选项
+- 支持上下键选择，Enter键确认
+
+*补全优先级*:
+1. 当前文件内的变量和函数（最高优先级）
+2. Python关键字
+3. Python内置函数
+4. 常用模块
+
+**3. 代码折叠**:
+
+*折叠规则*:
+- **函数折叠**：折叠函数体（def开头到函数结束）
+- **类折叠**：折叠类体（class开头到类结束）
+- **条件语句折叠**：折叠if/else/elif代码块
+- **循环语句折叠**：折叠for/while代码块
+- **注释折叠**：折叠多行注释
+
+*折叠操作*:
+- 点击行号左侧的折叠图标（▼）折叠代码块
+- 点击折叠图标（▶）展开代码块
+- 快捷键：Ctrl+Shift+[ 折叠，Ctrl+Shift+] 展开
+- 折叠后显示"..."表示折叠内容
+
+**4. 括号匹配**:
+
+*匹配规则*:
+- 输入左括号（(、[、{）自动补全右括号（)、]、}）
+- 光标自动定位到括号内
+- 选中文本后输入左括号，自动包裹文本
+- 删除左括号时，自动删除右括号（如果括号内为空）
+
+*高亮匹配*:
+- 光标在括号上时，高亮显示匹配的括号
+- 匹配的括号用边框标记
+- 不匹配的括号用红色标记
+
+**5. 快捷键**:
+
+| 快捷键 | 功能 | 说明 |
+|--------|------|------|
+| **Ctrl+S** | 保存代码 | 保存到本地存储 |
+| **Ctrl+Enter** | 运行代码 | 执行当前代码 |
+| **Ctrl+/** | 注释/取消注释 | 单行或多行注释 |
+| **Ctrl+Z** | 撤销 | 撤销上一步操作 |
+| **Ctrl+Y** | 重做 | 重做上一步操作 |
+| **Ctrl+F** | 查找 | 查找文本 |
+| **Ctrl+H** | 替换 | 替换文本 |
+| **Ctrl+A** | 全选 | 选中所有代码 |
+| **Ctrl+C** | 复制 | 复制选中文本 |
+| **Ctrl+V** | 粘贴 | 粘贴文本 |
+| **Ctrl+X** | 剪切 | 剪切选中文本 |
+| **Ctrl+D** | 删除行 | 删除当前行 |
+| **Ctrl+Shift+D** | 复制行 | 复制当前行 |
+| **Ctrl+Shift+K** | 删除行 | 删除当前行 |
+| **Ctrl+]** | 增加缩进 | 增加选中行缩进 |
+| **Ctrl+[** | 减少缩进 | 减少选中行缩进 |
+| **Ctrl+Space** | 自动补全 | 显示补全列表 |
+| **Tab** | 缩进 | 缩进4空格 |
+| **Shift+Tab** | 取消缩进 | 取消缩进4空格 |
+
+**6. 其他功能**:
+
+*行号显示*:
+- 显示行号（从1开始）
+- 当前行高亮显示
+- 行号宽度自动调整
+
+*代码缩进*:
+- Tab键缩进4空格（符合PEP 8规范）
+- 自动缩进：按Enter键后自动缩进到上一行的缩进级别
+- 智能缩进：在函数、类、条件语句、循环语句后自动增加缩进
+
+*撤销/重做*:
+- 支持无限次撤销/重做
+- 撤销/重做历史记录保存到本地存储
+- 刷新页面后撤销/重做历史记录不丢失
+
+*代码保存*:
+- 自动保存：每30秒自动保存到本地存储
+- 手动保存：Ctrl+S保存到本地存储
+- 保存提示：保存成功后显示Toast提示
 
 **技术实现**:
-- 使用CodeMirror 6
-- Python语法高亮插件
-- 自动补全插件
-- 代码折叠插件
+
+*核心库*:
+- **CodeMirror 6**：代码编辑器核心
+- **@codemirror/lang-python**：Python语法支持
+- **@codemirror/autocomplete**：自动补全
+- **@codemirror/fold**：代码折叠
+- **@codemirror/search**：查找替换
+- **@codemirror/commands**：快捷键命令
+
+*配置参数*:
+```javascript
+{
+  theme: 'light',  // 主题：light/dark
+  lineNumbers: true,  // 显示行号
+  highlightActiveLine: true,  // 高亮当前行
+  indentUnit: 4,  // 缩进单位：4空格
+  tabSize: 4,  // Tab大小：4空格
+  lineWrapping: false,  // 不自动换行
+  autoCloseBrackets: true,  // 自动闭合括号
+  matchBrackets: true,  // 括号匹配
+  foldGutter: true,  // 显示折叠图标
+  autocompletion: true,  // 自动补全
+  history: true,  // 撤销/重做
+  maxLength: 100000,  // 最大字符数：10万
+}
+```
 
 **验收标准**:
-- ✅ 1000行代码流畅编辑
+- ✅ 1000行代码流畅编辑（无卡顿）
+- ✅ 10000行代码可编辑（轻微卡顿可接受）
 - ✅ 语法高亮准确率 >99%
 - ✅ 自动补全响应时间 <100ms
-- ✅ 支持常用快捷键 >10个
+- ✅ 自动补全准确率 >90%
+- ✅ 支持常用快捷键 >15个
+- ✅ 代码折叠功能正常
+- ✅ 括号匹配功能正常
+- ✅ 撤销/重做功能正常
+- ✅ 自动保存功能正常
 
 #### F3. 实时代码执行
 
@@ -2524,37 +2851,297 @@ class User:
 | **安全沙箱** | Docker容器隔离 | P0 | 无法访问宿主机、外网 |
 | **资源限制** | CPU、内存、时间限制 | P0 | CPU 1核、内存256MB、超时5秒 |
 | **错误处理** | 友好的错误提示 | P1 | 错误信息清晰易懂 |
+| **执行队列** | 异步执行队列 | P0 | 支持并发执行 |
+| **执行历史** | 保存执行历史 | P1 | 可查看历史记录 |
+
+**详细规格说明**:
+
+**1. 代码执行流程**:
+
+```
+1. 用户点击"运行代码"按钮
+2. 前端发送代码到后端API
+3. 后端验证代码（长度、危险操作）
+4. 后端创建Submission记录（status=pending）
+5. 后端将任务加入Celery队列
+6. 前端显示"执行中..."状态
+7. Celery Worker从队列获取任务
+8. Worker创建Docker容器
+9. Worker将代码写入容器
+10. Worker执行代码（设置资源限制）
+11. Worker捕获stdout、stderr、exit_code
+12. Worker计算执行时间和内存使用
+13. Worker更新Submission记录（status=accepted/error/timeout）
+14. Worker删除Docker容器
+15. 后端通过WebSocket推送结果到前端
+16. 前端显示执行结果
+```
+
+**2. Docker沙箱配置**:
+
+*Docker镜像*:
+- 基础镜像：python:3.8-slim
+- 预装库：无（用户代码不能import第三方库）
+- 镜像大小：<100MB
+- 镜像构建：
+```dockerfile
+FROM python:3.8-slim
+WORKDIR /app
+RUN useradd -m -u 1000 sandbox
+USER sandbox
+CMD ["python", "/app/code.py"]
+```
+
+*容器配置*:
+```python
+container_config = {
+    'image': 'pythonlearn/sandbox:latest',
+    'command': 'python /app/code.py',
+    'mem_limit': '256m',  # 内存限制：256MB
+    'memswap_limit': '256m',  # 禁用swap
+    'cpu_quota': 100000,  # CPU限制：1核（100000/100000）
+    'cpu_period': 100000,
+    'network_disabled': True,  # 禁用网络
+    'read_only': True,  # 只读文件系统
+    'volumes': {
+        '/tmp/code.py': {'bind': '/app/code.py', 'mode': 'ro'}
+    },
+    'working_dir': '/app',
+    'user': 'sandbox',  # 非root用户
+    'pids_limit': 50,  # 进程数限制
+    'ulimits': [
+        {'name': 'nofile', 'soft': 64, 'hard': 64},  # 文件描述符限制
+        {'name': 'nproc', 'soft': 50, 'hard': 50}  # 进程数限制
+    ],
+    'security_opt': ['no-new-privileges'],  # 禁止提权
+    'cap_drop': ['ALL'],  # 移除所有capabilities
+    'remove': True,  # 执行完自动删除
+    'detach': False,  # 同步执行
+    'stdout': True,
+    'stderr': True
+}
+```
+
+*执行超时*:
+- 超时时间：5秒
+- 超时处理：强制停止容器，返回timeout状态
+- 超时提示："代码执行超时（>5秒），请检查是否存在无限循环"
+
+**3. 代码验证**:
+
+*长度限制*:
+- 最小长度：1字符
+- 最大长度：10000字符（约300行）
+- 超出限制：提示"代码长度超出限制（最大10000字符）"
+
+*危险操作检测*:
+```python
+DANGEROUS_IMPORTS = [
+    'os', 'sys', 'subprocess', 'socket', 'urllib',
+    'requests', 'http', 'ftplib', 'smtplib',
+    '__import__', 'eval', 'exec', 'compile',
+    'open', 'file', 'input', 'raw_input'
+]
+
+DANGEROUS_KEYWORDS = [
+    '__builtins__', '__globals__', '__locals__',
+    '__import__', '__code__', '__class__'
+]
+```
+
+*检测规则*:
+- 检测import语句：禁止import危险模块
+- 检测关键字：禁止使用危险关键字
+- 检测函数调用：禁止调用危险函数
+- 检测失败：返回错误提示"代码包含危险操作，禁止执行"
+
+**4. 测试用例执行**:
+
+*测试用例格式*:
+```python
+{
+    "input": "5\n",  # 输入数据
+    "expected_output": "120\n",  # 期望输出
+    "is_sample": True,  # 是否为示例用例
+    "timeout": 5  # 超时时间（秒）
+}
+```
+
+*执行流程*:
+```
+1. 获取题目的所有测试用例
+2. 遍历每个测试用例
+3. 将测试用例的input作为stdin传入代码
+4. 执行代码，捕获stdout
+5. 比较stdout和expected_output
+6. 记录测试结果（通过/失败）
+7. 如果所有测试用例通过，status=accepted
+8. 如果任一测试用例失败，status=wrong_answer
+9. 返回测试结果详情
+```
+
+*输出比较规则*:
+- 去除首尾空白字符
+- 去除行尾空白字符
+- 统一换行符（\n）
+- 大小写敏感
+- 浮点数比较：误差<1e-6
+
+**5. 执行结果**:
+
+*成功状态（accepted）*:
+```json
+{
+  "status": "accepted",
+  "stdout": "120\n",
+  "stderr": "",
+  "exit_code": 0,
+  "execution_time": 123,  // ms
+  "memory_used": 8192,  // KB
+  "test_results": [
+    {"input": "5\n", "expected": "120\n", "actual": "120\n", "passed": true},
+    {"input": "10\n", "expected": "3628800\n", "actual": "3628800\n", "passed": true}
+  ]
+}
+```
+
+*错误状态（error）*:
+```json
+{
+  "status": "error",
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"/app/code.py\", line 5, in <module>\n    print(1/0)\nZeroDivisionError: division by zero\n",
+  "exit_code": 1,
+  "execution_time": 45,
+  "memory_used": 7680,
+  "error_message": "运行时错误：除数不能为零（第5行）"
+}
+```
+
+*超时状态（timeout）*:
+```json
+{
+  "status": "timeout",
+  "stdout": "",
+  "stderr": "",
+  "exit_code": -1,
+  "execution_time": 5000,
+  "memory_used": 0,
+  "error_message": "代码执行超时（>5秒），请检查是否存在无限循环"
+}
+```
+
+*答案错误状态（wrong_answer）*:
+```json
+{
+  "status": "wrong_answer",
+  "stdout": "121\n",
+  "stderr": "",
+  "exit_code": 0,
+  "execution_time": 98,
+  "memory_used": 8064,
+  "test_results": [
+    {"input": "5\n", "expected": "120\n", "actual": "121\n", "passed": false}
+  ],
+  "error_message": "测试用例1未通过：期望输出120，实际输出121"
+}
+```
+
+**6. 错误处理和友好提示**:
+
+| 错误类型 | 原始错误 | 友好提示 |
+|---------|---------|---------|
+| **语法错误** | SyntaxError: invalid syntax | 语法错误：第X行代码语法不正确 |
+| **缩进错误** | IndentationError: unexpected indent | 缩进错误：第X行缩进不正确 |
+| **名称错误** | NameError: name 'x' is not defined | 名称错误：变量'x'未定义 |
+| **类型错误** | TypeError: unsupported operand type(s) | 类型错误：不支持的操作类型 |
+| **除零错误** | ZeroDivisionError: division by zero | 运行时错误：除数不能为零 |
+| **索引错误** | IndexError: list index out of range | 索引错误：列表索引超出范围 |
+| **键错误** | KeyError: 'key' | 键错误：字典键'key'不存在 |
+| **值错误** | ValueError: invalid literal | 值错误：无效的值 |
+| **导入错误** | ImportError: No module named 'xxx' | 导入错误：模块'xxx'不存在（仅支持Python标准库） |
+| **超时** | Timeout | 代码执行超时（>5秒），请检查是否存在无限循环 |
+| **内存溢出** | MemoryError | 内存溢出：代码使用内存超过256MB |
 
 **技术实现**:
-- Docker SDK for Python
-- Python 3.8+ 镜像
-- 资源限制（CPU、内存、时间）
-- 网络隔离
+
+*后端技术栈*:
+- **Flask**：Web框架
+- **Celery**：异步任务队列
+- **Redis**：消息队列和缓存
+- **Docker SDK for Python**：Docker容器管理
+- **WebSocket**：实时推送执行结果
+
+*执行队列*:
+```python
+# Celery任务
+@celery.task
+def execute_code(submission_id):
+    submission = Submission.query.get(submission_id)
+    submission.status = 'running'
+    db.session.commit()
+
+    try:
+        # 创建Docker容器并执行代码
+        result = run_code_in_docker(submission.code)
+
+        # 更新Submission记录
+        submission.status = result['status']
+        submission.stdout = result['stdout']
+        submission.stderr = result['stderr']
+        submission.exit_code = result['exit_code']
+        submission.execution_time = result['execution_time']
+        submission.memory_used = result['memory_used']
+        db.session.commit()
+
+        # 推送结果到前端
+        socketio.emit('execution_result', result, room=submission.user_id)
+
+    except Exception as e:
+        submission.status = 'error'
+        submission.stderr = str(e)
+        db.session.commit()
+```
 
 **数据模型**:
 
 ```python
 class Submission:
     id: int  # 主键
-    user_id: int  # 用户ID
-    problem_id: int  # 题目ID
-    code: str  # 代码
-    language: str  # 语言（python）
+    user_id: int  # 用户ID（外键）
+    problem_id: int  # 题目ID（外键，可为空）
+    code: str  # 代码（最大10000字符）
+    language: str  # 语言（python，默认）
     status: str  # 状态（pending/running/accepted/wrong_answer/error/timeout）
-    stdout: str  # 标准输出
-    stderr: str  # 标准错误
+    stdout: str  # 标准输出（最大10000字符）
+    stderr: str  # 标准错误（最大10000字符）
     exit_code: int  # 退出码
     execution_time: int  # 执行时间（ms）
     memory_used: int  # 内存使用（KB）
+    test_results: JSON  # 测试结果（JSON格式）
     created_at: datetime  # 创建时间
+    updated_at: datetime  # 更新时间
 ```
+
+**API接口**:
+
+| 接口 | 方法 | 路径 | 请求参数 | 响应数据 | 状态码 |
+|------|------|------|---------|---------|--------|
+| 执行代码 | POST | /api/submissions | code, problem_id | submission | 201 |
+| 获取执行结果 | GET | /api/submissions/{id} | - | submission | 200 |
+| 获取执行历史 | GET | /api/submissions | user_id, problem_id | submissions | 200 |
 
 **验收标准**:
 - ✅ 代码执行成功率 >99%
-- ✅ 简单代码执行时间 <2秒
+- ✅ 简单代码执行时间 <2秒（含容器启动）
 - ✅ 复杂代码执行时间 <5秒
-- ✅ 沙箱无法突破
+- ✅ 沙箱无法突破（安全测试100%通过）
 - ✅ 支持并发执行 >20
+- ✅ 危险操作检测准确率 100%
+- ✅ 测试用例执行准确率 >99%
+- ✅ 错误提示友好度 >90%（用户调研）
+- ✅ 执行队列稳定性 >99%
+- ✅ 容器资源隔离有效性 100%
 
 #### F4. 题库管理
 
@@ -2572,31 +3159,211 @@ class Submission:
 | **题目列表** | 查看题目列表 | P0 | 显示题目标题、难度、标签 |
 | **题目详情** | 查看题目详情 | P0 | 显示题目描述、输入输出、示例 |
 | **题目筛选** | 按难度、标签筛选 | P1 | 筛选结果正确 |
+| **题目搜索** | 搜索题目 | P1 | 搜索结果正确 |
 | **题目创建** | 创建新题目 | P1 | 题目保存成功 |
 | **题目编辑** | 编辑题目 | P1 | 题目更新成功 |
 | **题目删除** | 删除题目 | P2 | 题目删除成功 |
+| **题目导入** | 批量导入题目 | P2 | 导入成功 |
+| **题目导出** | 导出题目 | P2 | 导出成功 |
+
+**详细规格说明**:
+
+**1. 题目列表**:
+
+*显示内容*:
+- 题目编号（自动生成，如P001）
+- 题目标题（最多50字符）
+- 难度标签（简单/中等/困难，颜色区分）
+- 分类标签（最多显示3个）
+- 通过率（已通过人数/总提交人数）
+- 我的状态（未开始/进行中/已通过）
+
+*排序方式*:
+- 默认排序：按编号升序
+- 难度排序：简单→中等→困难
+- 通过率排序：低→高或高→低
+- 最新排序：按创建时间降序
+
+*分页*:
+- 每页显示：20题
+- 分页控件：首页、上一页、页码、下一页、尾页
+- 跳转：输入页码跳转
+
+**2. 题目详情**:
+
+*题目信息*:
+- 题目编号和标题
+- 难度和标签
+- 题目描述（Markdown格式，支持代码块、图片、表格）
+- 输入格式说明
+- 输出格式说明
+- 数据范围
+- 示例输入输出（至少1个）
+- 提示（3级渐进式提示，点击显示）
+- 参考答案（仅教师可见）
+
+*统计信息*:
+- 总提交次数
+- 通过次数
+- 通过率
+- 平均执行时间
+- 平均内存使用
+
+*我的提交记录*:
+- 提交时间
+- 提交状态（通过/失败/错误/超时）
+- 执行时间
+- 内存使用
+- 查看代码
+
+**3. 题目筛选和搜索**:
+
+*筛选条件*:
+- 难度：全部/简单/中等/困难
+- 标签：全部/基础语法/控制流程/函数/数据结构/面向对象/文件操作/异常处理/高级特性
+- 状态：全部/未开始/进行中/已通过
+- 学习阶段：全部/阶段1-8
+
+*搜索*:
+- 搜索范围：题目标题、题目描述
+- 搜索方式：模糊搜索
+- 搜索结果：高亮显示匹配关键词
+
+**4. 题目创建/编辑**:
+
+*基本信息*:
+- 题目标题（必填，2-50字符）
+- 难度（必填，简单/中等/困难）
+- 标签（必填，至少1个，最多5个）
+- 学习阶段（必填，阶段1-8）
+
+*题目描述*:
+- 题目描述（必填，Markdown格式）
+- 输入格式（必填）
+- 输出格式（必填）
+- 数据范围（可选）
+
+*示例*:
+- 示例输入（必填，至少1个）
+- 示例输出（必填，至少1个）
+- 示例说明（可选）
+
+*测试用例*:
+- 输入数据（必填）
+- 期望输出（必填）
+- 是否为示例（默认：否）
+- 超时时间（默认：5秒）
+- 至少3个测试用例（1个示例用例 + 2个隐藏用例）
+
+*提示*:
+- 提示1（轻度提示，可选）
+- 提示2（中度提示，可选）
+- 提示3（重度提示，可选）
+
+*参考答案*:
+- 参考代码（可选，Python代码）
+- 答案说明（可选，Markdown格式）
+
+*验证规则*:
+- 题目标题不能为空
+- 题目描述不能为空
+- 至少1个示例用例
+- 至少3个测试用例
+- 测试用例的输入输出不能为空
+- 参考答案必须能通过所有测试用例
+
+**5. 题目导入/导出**:
+
+*导入格式*:
+- 文件格式：YAML
+- 文件大小：最大10MB
+- 批量导入：最多100题
+
+*YAML格式示例*:
+```yaml
+- id: P001
+  title: 计算阶乘
+  difficulty: easy
+  tags: [基础语法, 函数]
+  stage: 3
+  description: |
+    编写一个函数，计算给定整数n的阶乘。
+
+    阶乘定义：n! = 1 × 2 × 3 × ... × n
+  input_format: 一个整数n（1 ≤ n ≤ 20）
+  output_format: n的阶乘
+  test_cases:
+    - input: "5\n"
+      expected_output: "120\n"
+      is_sample: true
+    - input: "10\n"
+      expected_output: "3628800\n"
+      is_sample: false
+  hints:
+    - 可以使用循环计算阶乘
+    - 也可以使用递归
+    - 注意边界条件：0! = 1
+  solution: |
+    def factorial(n):
+        if n == 0:
+            return 1
+        return n * factorial(n - 1)
+
+    n = int(input())
+    print(factorial(n))
+```
+
+*导出格式*:
+- 文件格式：YAML或JSON
+- 导出范围：全部题目或筛选后的题目
+- 导出内容：包含题目信息、测试用例、提示、参考答案
 
 **数据模型**:
 
 ```python
 class Problem:
     id: int  # 主键
-    title: str  # 标题
-    description: str  # 描述（Markdown）
+    code: str  # 题目编号（如P001，唯一）
+    title: str  # 标题（2-50字符）
+    description: str  # 描述（Markdown，最大10000字符）
     difficulty: str  # 难度（easy/medium/hard）
-    tags: list[str]  # 标签
-    test_cases: list[TestCase]  # 测试用例
-    hints: list[str]  # 提示（3级）
-    solution: str  # 参考答案
-    created_by: int  # 创建者ID
+    tags: JSON  # 标签（JSON数组，最多5个）
+    stage: int  # 学习阶段（1-8）
+    input_format: str  # 输入格式
+    output_format: str  # 输出格式
+    data_range: str  # 数据范围（可选）
+    test_cases: JSON  # 测试用例（JSON数组）
+    hints: JSON  # 提示（JSON数组，最多3个）
+    solution: str  # 参考答案（Python代码）
+    solution_explanation: str  # 答案说明（Markdown）
+    created_by: int  # 创建者ID（外键）
+    is_public: bool  # 是否公开（默认：True）
+    submission_count: int  # 提交次数（默认：0）
+    accepted_count: int  # 通过次数（默认：0）
     created_at: datetime  # 创建时间
     updated_at: datetime  # 更新时间
 
-class TestCase:
-    input: str  # 输入
-    expected_output: str  # 期望输出
-    is_sample: bool  # 是否为示例
+class ProblemSubmission:
+    id: int  # 主键
+    user_id: int  # 用户ID（外键）
+    problem_id: int  # 题目ID（外键）
+    status: str  # 状态（accepted/wrong_answer/error/timeout）
+    created_at: datetime  # 创建时间
 ```
+
+**API接口**:
+
+| 接口 | 方法 | 路径 | 请求参数 | 响应数据 | 状态码 |
+|------|------|------|---------|---------|--------|
+| 获取题目列表 | GET | /api/problems | difficulty, tags, status, stage, page, per_page | problems, total | 200 |
+| 获取题目详情 | GET | /api/problems/{id} | - | problem | 200 |
+| 搜索题目 | GET | /api/problems/search | q, page, per_page | problems, total | 200 |
+| 创建题目 | POST | /api/problems | problem | problem | 201 |
+| 更新题目 | PUT | /api/problems/{id} | problem | problem | 200 |
+| 删除题目 | DELETE | /api/problems/{id} | - | message | 200 |
+| 导入题目 | POST | /api/problems/import | file | count, errors | 200 |
+| 导出题目 | GET | /api/problems/export | ids, format | file | 200 |
+| 获取我的提交记录 | GET | /api/problems/{id}/submissions | - | submissions | 200 |
 
 **验收标准**:
 - ✅ 题库规模 >100题（MVP）
@@ -2604,6 +3371,12 @@ class TestCase:
 - ✅ 题目难度分布合理（easy 40%, medium 40%, hard 20%）
 - ✅ 每题至少3个测试用例
 - ✅ 每题至少3级提示
+- ✅ 题目列表加载时间 <300ms
+- ✅ 题目详情加载时间 <200ms
+- ✅ 题目搜索响应时间 <500ms
+- ✅ 题目创建成功率 >99%
+- ✅ 题目导入成功率 >95%
+- ✅ 支持并发访问 >100
 
 #### F5. 班级管理（基础版）
 
@@ -2625,49 +3398,230 @@ class TestCase:
 | **移除学生** | 从班级移除学生 | P1 | 学生移除成功 |
 | **发布公告** | 发布班级公告 | P1 | 公告发布成功，学生收到通知 |
 | **查看学生列表** | 查看班级学生列表 | P0 | 显示学生姓名、学号、加入时间 |
+| **查看班级统计** | 查看班级学习统计 | P1 | 显示作业完成率、平均分 |
+
+**详细规格说明**:
+
+**1. 创建班级**:
+
+*输入字段*:
+- 班级名称（必填）：
+  - 长度：2-50字符
+  - 字符：支持中文、英文、数字、空格
+  - 示例："2024级Python编程班"
+- 班级描述（可选）：
+  - 长度：0-500字符
+  - 格式：纯文本
+  - 示例："本班级用于2024级学生学习Python编程"
+- 学期（可选）：
+  - 格式：YYYY-学期（如"2024-秋季"）
+  - 默认：当前学期
+
+*业务规则*:
+- 同一教师可以创建多个班级
+- 班级名称在同一教师下不能重复
+- 创建成功后自动生成6位邀请码（大写字母+数字）
+- 邀请码全局唯一，有效期永久
+- 教师自动成为班级管理员
+
+*交互流程*:
+```
+1. 教师点击"创建班级"按钮
+2. 教师填写班级信息
+3. 教师点击"确定"按钮
+4. 系统验证班级名称唯一性
+5. 系统生成唯一邀请码
+6. 系统创建班级记录
+7. 系统添加教师为班级成员（role=teacher）
+8. 系统显示班级详情和邀请码
+9. 教师可以复制邀请码分享给学生
+```
+
+**2. 加入班级**:
+
+*输入字段*:
+- 邀请码（必填）：
+  - 长度：6字符
+  - 格式：大写字母+数字
+  - 示例："ABC123"
+
+*业务规则*:
+- 学生通过邀请码加入班级
+- 同一学生可以加入多个班级
+- 同一学生不能重复加入同一班级
+- 加入成功后学生收到通知
+
+*交互流程*:
+```
+1. 学生点击"加入班级"按钮
+2. 学生输入邀请码
+3. 学生点击"加入"按钮
+4. 系统验证邀请码有效性
+5. 系统检查学生是否已加入该班级
+6. 系统添加学生为班级成员（role=student）
+7. 系统发送通知给学生
+8. 系统跳转到班级详情页
+```
+
+*错误处理*:
+- 邀请码不存在：提示"邀请码无效，请检查后重试"
+- 已加入班级：提示"您已加入该班级"
+- 网络错误：提示"网络错误，请稍后重试"
+
+**3. 班级成员管理**:
+
+*学生列表显示*:
+- 学生姓名
+- 学生邮箱
+- 加入时间
+- 学习统计（完成题数、正确率、学习时长）
+- 操作（移除）
+
+*排序方式*:
+- 默认排序：按加入时间升序
+- 姓名排序：按姓名拼音升序
+- 完成题数排序：降序
+- 正确率排序：降序
+
+*移除学生*:
+- 教师可以移除学生
+- 移除后学生无法访问班级资源
+- 移除后学生的作业提交记录保留
+- 移除后学生收到通知
+
+**4. 班级公告**:
+
+*发布公告*:
+- 公告标题（必填）：
+  - 长度：2-100字符
+  - 示例："本周作业通知"
+- 公告内容（必填）：
+  - 长度：10-5000字符
+  - 格式：Markdown
+  - 支持：文本、链接、图片、代码块
+- 置顶（可选）：
+  - 类型：复选框
+  - 说明：置顶公告显示在列表顶部
+
+*公告列表*:
+- 显示内容：标题、发布时间、发布者
+- 排序：置顶公告在前，其他按发布时间降序
+- 分页：每页10条
+
+*公告详情*:
+- 标题
+- 内容（Markdown渲染）
+- 发布者
+- 发布时间
+- 已读人数
+
+*通知机制*:
+- 发布公告后，所有班级成员收到通知
+- 通知方式：站内通知（未来支持邮件、短信）
+- 通知内容：公告标题和摘要
+
+**5. 班级统计**:
+
+*统计指标*:
+- 班级人数
+- 作业总数
+- 平均作业完成率
+- 平均作业分数
+- 活跃学生数（7天内有提交记录）
+- 学习时长排行榜（Top 10）
+- 完成题数排行榜（Top 10）
+
+*图表展示*:
+- 作业完成率趋势图（折线图）
+- 作业分数分布图（柱状图）
+- 学生活跃度图（饼图）
 
 **数据模型**:
 
 ```python
 class Class:
     id: int  # 主键
-    name: str  # 班级名称
-    description: str  # 班级描述
-    teacher_id: int  # 教师ID
-    invite_code: str  # 邀请码（6位随机字符）
+    name: str  # 班级名称（2-50字符）
+    description: str  # 班级描述（0-500字符）
+    semester: str  # 学期（如"2024-秋季"）
+    teacher_id: int  # 教师ID（外键）
+    invite_code: str  # 邀请码（6位，唯一，索引）
+    is_active: bool  # 是否激活（默认：True）
+    member_count: int  # 成员数（默认：0）
     created_at: datetime  # 创建时间
     updated_at: datetime  # 更新时间
 
 class ClassMember:
     id: int  # 主键
-    class_id: int  # 班级ID
-    user_id: int  # 用户ID
+    class_id: int  # 班级ID（外键，索引）
+    user_id: int  # 用户ID（外键，索引）
     role: str  # 角色（teacher/student）
     joined_at: datetime  # 加入时间
 
+    # 唯一约束：(class_id, user_id)
+
 class Announcement:
     id: int  # 主键
-    class_id: int  # 班级ID
-    title: str  # 标题
-    content: str  # 内容（Markdown）
-    created_by: int  # 创建者ID
+    class_id: int  # 班级ID（外键，索引）
+    title: str  # 标题（2-100字符）
+    content: str  # 内容（Markdown，10-5000字符）
+    is_pinned: bool  # 是否置顶（默认：False）
+    created_by: int  # 创建者ID（外键）
+    read_count: int  # 已读人数（默认：0）
     created_at: datetime  # 创建时间
+    updated_at: datetime  # 更新时间
+
+class AnnouncementRead:
+    id: int  # 主键
+    announcement_id: int  # 公告ID（外键）
+    user_id: int  # 用户ID（外键）
+    read_at: datetime  # 阅读时间
+
+    # 唯一约束：(announcement_id, user_id)
 ```
 
 **API接口**:
 
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 创建班级 | POST | /api/classes | 创建新班级 |
-| 获取班级列表 | GET | /api/classes | 获取教师的班级列表 |
-| 获取班级详情 | GET | /api/classes/{id} | 获取班级详情 |
-| 更新班级 | PUT | /api/classes/{id} | 更新班级信息 |
-| 删除班级 | DELETE | /api/classes/{id} | 删除班级 |
-| 加入班级 | POST | /api/classes/join | 学生通过邀请码加入班级 |
-| 获取班级成员 | GET | /api/classes/{id}/members | 获取班级成员列表 |
-| 移除成员 | DELETE | /api/classes/{id}/members/{user_id} | 移除班级成员 |
-| 发布公告 | POST | /api/classes/{id}/announcements | 发布班级公告 |
-| 获取公告列表 | GET | /api/classes/{id}/announcements | 获取班级公告列表 |
+| 接口 | 方法 | 路径 | 请求参数 | 响应数据 | 状态码 |
+|------|------|------|---------|---------|--------|
+| 创建班级 | POST | /api/classes | name, description, semester | class | 201 |
+| 获取班级列表 | GET | /api/classes | role, page, per_page | classes, total | 200 |
+| 获取班级详情 | GET | /api/classes/{id} | - | class | 200 |
+| 更新班级 | PUT | /api/classes/{id} | name, description, semester | class | 200 |
+| 删除班级 | DELETE | /api/classes/{id} | - | message | 200 |
+| 加入班级 | POST | /api/classes/join | invite_code | class | 200 |
+| 退出班级 | POST | /api/classes/{id}/leave | - | message | 200 |
+| 获取班级成员 | GET | /api/classes/{id}/members | role, page, per_page | members, total | 200 |
+| 移除成员 | DELETE | /api/classes/{id}/members/{user_id} | - | message | 200 |
+| 发布公告 | POST | /api/classes/{id}/announcements | title, content, is_pinned | announcement | 201 |
+| 获取公告列表 | GET | /api/classes/{id}/announcements | page, per_page | announcements, total | 200 |
+| 获取公告详情 | GET | /api/announcements/{id} | - | announcement | 200 |
+| 标记公告已读 | POST | /api/announcements/{id}/read | - | message | 200 |
+| 获取班级统计 | GET | /api/classes/{id}/stats | - | stats | 200 |
+
+**API请求示例**:
+
+```json
+// POST /api/classes
+{
+  "name": "2024级Python编程班",
+  "description": "本班级用于2024级学生学习Python编程",
+  "semester": "2024-秋季"
+}
+
+// 响应
+{
+  "id": 1,
+  "name": "2024级Python编程班",
+  "description": "本班级用于2024级学生学习Python编程",
+  "semester": "2024-秋季",
+  "teacher_id": 1,
+  "invite_code": "ABC123",
+  "is_active": true,
+  "member_count": 1,
+  "created_at": "2025-11-07T10:00:00Z"
+}
+```
 
 **验收标准**:
 - ✅ 教师可以创建班级，生成唯一邀请码
@@ -2675,6 +3629,13 @@ class Announcement:
 - ✅ 教师可以查看班级学生列表
 - ✅ 教师可以发布公告，学生收到通知
 - ✅ 支持多个班级管理
+- ✅ 邀请码唯一性 100%
+- ✅ 班级创建成功率 >99%
+- ✅ 学生加入成功率 >99%
+- ✅ 公告发布成功率 >99%
+- ✅ 班级列表加载时间 <300ms
+- ✅ 班级成员列表加载时间 <500ms
+- ✅ 支持并发访问 >100
 
 #### F6. 作业系统（基础版）
 
@@ -2697,51 +3658,268 @@ class Announcement:
 | **查看提交** | 查看作业提交详情 | P0 | 显示代码、结果、分数 |
 | **作业统计** | 查看作业统计 | P0 | 显示提交率、平均分、分数分布 |
 | **学生统计** | 查看学生作业统计 | P0 | 显示完成题数、正确率、学习时长 |
+| **重新提交** | 学生重新提交作业 | P1 | 重新提交成功，更新分数 |
+| **作业导出** | 导出作业统计 | P2 | 导出Excel成功 |
+
+**详细规格说明**:
+
+**1. 创建作业**:
+
+*输入字段*:
+- 作业标题（必填）：
+  - 长度：2-100字符
+  - 示例："第1周作业：Python基础"
+- 作业描述（可选）：
+  - 长度：0-1000字符
+  - 格式：Markdown
+  - 示例："本周作业包含5道题目，涵盖变量、数据类型、运算符等知识点"
+- 所属班级（必填）：
+  - 类型：下拉选择
+  - 选项：教师创建的所有班级
+- 题目列表（必填）：
+  - 类型：多选
+  - 最少：1题
+  - 最多：20题
+  - 支持搜索和筛选
+- 截止时间（必填）：
+  - 类型：日期时间选择器
+  - 限制：必须晚于当前时间
+  - 示例："2025-11-14 23:59:59"
+- 允许迟交（可选）：
+  - 类型：复选框
+  - 说明：勾选后，截止时间后仍可提交，但标记为迟交
+- 迟交扣分（可选）：
+  - 类型：数字输入
+  - 范围：0-100
+  - 单位：百分比
+  - 示例：迟交扣20%分数
+
+*业务规则*:
+- 同一班级可以创建多个作业
+- 作业标题在同一班级下不能重复
+- 创建成功后，所有班级成员收到通知
+- 作业创建后可以编辑，但不能修改题目列表（防止学生已提交）
+- 作业发布后，学生可以立即查看和提交
+
+*交互流程*:
+```
+1. 教师点击"创建作业"按钮
+2. 教师填写作业信息
+3. 教师选择题目（支持搜索、筛选、预览）
+4. 教师设置截止时间
+5. 教师点击"发布"按钮
+6. 系统验证作业信息
+7. 系统创建作业记录
+8. 系统发送通知给所有班级成员
+9. 系统跳转到作业详情页
+```
+
+**2. 学生提交作业**:
+
+*作业列表（学生视图）*:
+- 显示内容：
+  - 作业标题
+  - 所属班级
+  - 截止时间
+  - 题目数量
+  - 我的进度（已完成/总题数）
+  - 我的分数
+  - 状态（未开始/进行中/已完成/已逾期）
+- 排序：按截止时间升序
+- 筛选：全部/未完成/已完成/已逾期
+
+*作业详情（学生视图）*:
+- 作业信息：标题、描述、截止时间、题目数量
+- 题目列表：
+  - 题目编号和标题
+  - 我的状态（未开始/已通过/未通过）
+  - 我的分数
+  - 操作（开始答题/查看提交）
+- 我的统计：
+  - 已完成题数
+  - 总分
+  - 排名（班级内）
+
+*提交流程*:
+```
+1. 学生点击"开始答题"
+2. 系统跳转到题目详情页
+3. 学生编写代码
+4. 学生点击"提交"按钮
+5. 系统执行代码（调用F3代码执行）
+6. 系统运行测试用例
+7. 系统计算分数（通过测试用例数/总测试用例数 × 100）
+8. 系统保存提交记录
+9. 系统更新作业进度
+10. 系统显示提交结果
+11. 学生可以继续答题或返回作业列表
+```
+
+*评分规则*:
+- 基础分数：通过测试用例数 / 总测试用例数 × 100
+- 迟交扣分：如果迟交，分数 × (1 - 迟交扣分比例)
+- 最终分数：向下取整
+- 示例：通过3/5个测试用例，迟交扣20%，最终分数 = 60 × 0.8 = 48分
+
+*重新提交*:
+- 学生可以多次提交同一题目
+- 每次提交都会重新评分
+- 最终分数取最高分
+- 提交历史记录保留
+
+**3. 作业统计（教师视图）**:
+
+*作业概览*:
+- 作业信息：标题、班级、截止时间、题目数量
+- 统计数据：
+  - 班级人数
+  - 已提交人数
+  - 提交率（已提交人数/班级人数 × 100%）
+  - 平均分
+  - 最高分
+  - 最低分
+  - 及格率（≥60分的人数/已提交人数 × 100%）
+
+*分数分布*:
+- 柱状图：横轴为分数段（0-59, 60-69, 70-79, 80-89, 90-100），纵轴为人数
+- 饼图：及格/不及格比例
+
+*题目统计*:
+- 题目列表：
+  - 题目编号和标题
+  - 提交人数
+  - 通过人数
+  - 通过率
+  - 平均分
+- 排序：按通过率升序（找出难题）
+
+*学生提交列表*:
+- 显示内容：
+  - 学生姓名
+  - 提交时间
+  - 完成题数
+  - 总分
+  - 状态（已完成/进行中/未开始）
+  - 是否迟交
+  - 操作（查看详情）
+- 排序：按总分降序
+- 筛选：全部/已完成/进行中/未开始/迟交
+- 导出：导出Excel（包含所有学生的提交记录）
+
+*学生详情*:
+- 学生信息：姓名、邮箱
+- 作业进度：已完成题数/总题数
+- 总分
+- 题目提交列表：
+  - 题目编号和标题
+  - 提交时间
+  - 状态（通过/未通过）
+  - 分数
+  - 执行时间
+  - 操作（查看代码）
+
+**4. 学生统计（教师视图）**:
+
+*统计指标*:
+- 基本信息：姓名、邮箱、加入时间
+- 学习数据：
+  - 完成作业数
+  - 平均分
+  - 完成题数
+  - 正确率（通过题数/完成题数 × 100%）
+  - 学习时长（总代码编辑时长）
+- 知识点掌握度：
+  - 基础语法：X%
+  - 控制流程：X%
+  - 函数：X%
+  - 数据结构：X%
+  - 面向对象：X%
+  - 文件操作：X%
+  - 异常处理：X%
+  - 高级特性：X%
+- 薄弱点识别：
+  - 列出掌握度<60%的知识点
+  - 推荐相关题目
+
+*图表展示*:
+- 学习时长趋势图（折线图）
+- 作业分数趋势图（折线图）
+- 知识点掌握度雷达图
 
 **数据模型**:
 
 ```python
 class Assignment:
     id: int  # 主键
-    class_id: int  # 班级ID
-    title: str  # 标题
-    description: str  # 描述
-    problem_ids: list[int]  # 题目ID列表
+    class_id: int  # 班级ID（外键，索引）
+    title: str  # 标题（2-100字符）
+    description: str  # 描述（Markdown，0-1000字符）
+    problem_ids: JSON  # 题目ID列表（JSON数组）
     deadline: datetime  # 截止时间
-    created_by: int  # 创建者ID
+    allow_late: bool  # 允许迟交（默认：False）
+    late_penalty: int  # 迟交扣分（0-100，默认：0）
+    created_by: int  # 创建者ID（外键）
+    is_published: bool  # 是否发布（默认：True）
     created_at: datetime  # 创建时间
     updated_at: datetime  # 更新时间
 
 class AssignmentSubmission:
     id: int  # 主键
-    assignment_id: int  # 作业ID
-    user_id: int  # 用户ID
-    problem_id: int  # 题目ID
-    code: str  # 代码
+    assignment_id: int  # 作业ID（外键，索引）
+    user_id: int  # 用户ID（外键，索引）
+    problem_id: int  # 题目ID（外键，索引）
+    submission_id: int  # 代码提交ID（外键，关联Submission表）
+    code: str  # 代码（最大10000字符）
     status: str  # 状态（accepted/wrong_answer/error/timeout）
     score: int  # 分数（0-100）
+    is_late: bool  # 是否迟交（默认：False）
     submitted_at: datetime  # 提交时间
+
+    # 唯一约束：(assignment_id, user_id, problem_id) - 每个学生每题只保留最高分
+
+class AssignmentProgress:
+    id: int  # 主键
+    assignment_id: int  # 作业ID（外键，索引）
+    user_id: int  # 用户ID（外键，索引）
+    completed_count: int  # 完成题数（默认：0）
+    total_score: int  # 总分（默认：0）
+    status: str  # 状态（not_started/in_progress/completed）
+    updated_at: datetime  # 更新时间
+
+    # 唯一约束：(assignment_id, user_id)
 ```
 
 **API接口**:
 
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 创建作业 | POST | /api/assignments | 创建新作业 |
-| 获取作业列表 | GET | /api/assignments | 获取作业列表 |
-| 获取作业详情 | GET | /api/assignments/{id} | 获取作业详情 |
-| 更新作业 | PUT | /api/assignments/{id} | 更新作业信息 |
-| 删除作业 | DELETE | /api/assignments/{id} | 删除作业 |
-| 提交作业 | POST | /api/assignments/{id}/submit | 提交作业 |
-| 获取作业统计 | GET | /api/assignments/{id}/stats | 获取作业统计 |
-| 获取学生统计 | GET | /api/classes/{id}/students/{user_id}/stats | 获取学生统计 |
+| 接口 | 方法 | 路径 | 请求参数 | 响应数据 | 状态码 |
+|------|------|------|---------|---------|--------|
+| 创建作业 | POST | /api/assignments | class_id, title, description, problem_ids, deadline, allow_late, late_penalty | assignment | 201 |
+| 获取作业列表 | GET | /api/assignments | class_id, status, page, per_page | assignments, total | 200 |
+| 获取作业详情 | GET | /api/assignments/{id} | - | assignment | 200 |
+| 更新作业 | PUT | /api/assignments/{id} | title, description, deadline, allow_late, late_penalty | assignment | 200 |
+| 删除作业 | DELETE | /api/assignments/{id} | - | message | 200 |
+| 提交作业 | POST | /api/assignments/{id}/submit | problem_id, code | submission | 201 |
+| 获取我的作业进度 | GET | /api/assignments/{id}/progress | - | progress | 200 |
+| 获取作业统计 | GET | /api/assignments/{id}/stats | - | stats | 200 |
+| 获取学生提交列表 | GET | /api/assignments/{id}/submissions | status, page, per_page | submissions, total | 200 |
+| 获取学生详情 | GET | /api/classes/{class_id}/students/{user_id}/stats | - | stats | 200 |
+| 导出作业统计 | GET | /api/assignments/{id}/export | format | file | 200 |
 
 **验收标准**:
 - ✅ 教师可以创建作业，选择题目，设置截止时间
 - ✅ 学生可以提交作业，自动批改
 - ✅ 教师可以查看作业统计（提交率、平均分、分数分布）
 - ✅ 教师可以查看学生统计（完成题数、正确率、学习时长）
-- ✅ 支持多题作业
+- ✅ 支持多题作业（1-20题）
+- ✅ 支持重新提交，取最高分
+- ✅ 支持迟交扣分
+- ✅ 作业创建成功率 >99%
+- ✅ 作业提交成功率 >99%
+- ✅ 自动批改准确率 100%
+- ✅ 作业列表加载时间 <300ms
+- ✅ 作业统计加载时间 <500ms
+- ✅ 支持并发提交 >50
+- ✅ 导出Excel成功率 >99%
 
 ### 5.2 V1.0新增功能（5个）
 
@@ -3017,86 +4195,443 @@ Docker环境 → F3 ↗
 
 **响应时间要求**:
 
-| 操作 | MVP目标 | V1.0目标 | V2.0目标 | 测量方式 |
-|------|---------|----------|----------|---------|
-| **页面加载时间** | <3秒 | <2秒 | <1秒 | Chrome DevTools |
-| **API响应时间** | <300ms | <200ms | <100ms | 后端日志 |
-| **代码执行时间** | <5秒 | <5秒 | <3秒 | Docker执行日志 |
-| **数据库查询时间** | <100ms | <50ms | <30ms | SQLAlchemy日志 |
-| **文件上传时间** | <2秒/MB | <1秒/MB | <500ms/MB | 前端计时 |
+| 操作 | MVP目标 | V1.0目标 | V2.0目标 | 测量方式 | 测试场景 |
+|------|---------|----------|----------|---------|---------|
+| **页面加载时间** | <3秒 | <2秒 | <1秒 | Chrome DevTools | 首次加载，3G网络 |
+| **API响应时间** | <300ms | <200ms | <100ms | 后端日志 | P95响应时间 |
+| **代码执行时间** | <5秒 | <5秒 | <3秒 | Docker执行日志 | 简单代码（<50行） |
+| **数据库查询时间** | <100ms | <50ms | <30ms | SQLAlchemy日志 | 单表查询，1000条数据 |
+| **文件上传时间** | <2秒/MB | <1秒/MB | <500ms/MB | 前端计时 | 题目导入（YAML文件） |
+
+**详细性能指标**:
+
+*前端性能*:
+- **首屏加载时间**（FCP - First Contentful Paint）：
+  - MVP: <2秒
+  - V1.0: <1.5秒
+  - V2.0: <1秒
+- **可交互时间**（TTI - Time to Interactive）：
+  - MVP: <4秒
+  - V1.0: <3秒
+  - V2.0: <2秒
+- **首次输入延迟**（FID - First Input Delay）：
+  - MVP: <100ms
+  - V1.0: <50ms
+  - V2.0: <30ms
+- **累积布局偏移**（CLS - Cumulative Layout Shift）：
+  - MVP: <0.1
+  - V1.0: <0.05
+  - V2.0: <0.01
+
+*后端性能*:
+- **API响应时间分布**：
+  - P50（中位数）: <100ms
+  - P95（95%请求）: <300ms
+  - P99（99%请求）: <500ms
+- **数据库查询性能**：
+  - 简单查询（单表）: <50ms
+  - 复杂查询（多表JOIN）: <200ms
+  - 聚合查询（COUNT、SUM）: <300ms
+- **缓存命中率**：
+  - Redis缓存命中率: >80%
+  - 浏览器缓存命中率: >90%
+
+*代码执行性能*:
+- **容器启动时间**: <1秒
+- **代码执行时间**：
+  - 简单代码（<50行，无循环）: <1秒
+  - 中等代码（50-200行，简单循环）: <3秒
+  - 复杂代码（>200行，嵌套循环）: <5秒
+- **测试用例执行时间**：
+  - 单个测试用例: <1秒
+  - 5个测试用例: <3秒
+  - 10个测试用例: <5秒
 
 **并发性能要求**:
 
-| 指标 | MVP目标 | V1.0目标 | V2.0目标 | 测量方式 |
-|------|---------|----------|----------|---------|
-| **并发用户数** | 50 | 100 | 500 | 压力测试 |
-| **并发代码执行** | 20 | 30 | 50 | Docker监控 |
-| **数据库连接数** | 50 | 100 | 200 | 数据库监控 |
-| **QPS（每秒请求数）** | 100 | 200 | 500 | 压力测试 |
+| 指标 | MVP目标 | V1.0目标 | V2.0目标 | 测量方式 | 测试工具 |
+|------|---------|----------|----------|---------|---------|
+| **并发用户数** | 50 | 100 | 500 | 压力测试 | Locust |
+| **并发代码执行** | 20 | 30 | 50 | Docker监控 | docker stats |
+| **数据库连接数** | 50 | 100 | 200 | 数据库监控 | SQLAlchemy pool |
+| **QPS（每秒请求数）** | 100 | 200 | 500 | 压力测试 | Locust |
+
+**详细并发指标**:
+
+*并发用户场景*:
+- **场景1：浏览题目**（50%用户）：
+  - 操作：浏览题目列表、查看题目详情
+  - 频率：每分钟5次请求
+  - 响应时间：<300ms
+- **场景2：编写代码**（30%用户）：
+  - 操作：编辑代码、保存代码
+  - 频率：每分钟10次请求
+  - 响应时间：<200ms
+- **场景3：执行代码**（20%用户）：
+  - 操作：提交代码、查看结果
+  - 频率：每分钟2次请求
+  - 响应时间：<5秒
+
+*并发代码执行*:
+- **队列管理**：
+  - 使用Celery异步任务队列
+  - 队列长度：最大100
+  - 超时处理：队列满时返回"系统繁忙，请稍后重试"
+- **资源限制**：
+  - 单用户并发执行：最多3个
+  - 全局并发执行：MVP 20个，V1.0 30个，V2.0 50个
+  - 超出限制：加入队列等待
 
 **系统可用性要求**:
 
-| 指标 | MVP目标 | V1.0目标 | V2.0目标 | 测量方式 |
-|------|---------|----------|----------|---------|
-| **系统可用性** | >95% | >99% | >99.9% | 监控系统 |
-| **平均故障恢复时间（MTTR）** | <4小时 | <2小时 | <1小时 | 运维日志 |
-| **平均故障间隔时间（MTBF）** | >168小时 | >336小时 | >720小时 | 运维日志 |
+| 指标 | MVP目标 | V1.0目标 | V2.0目标 | 测量方式 | 计算公式 |
+|------|---------|----------|----------|---------|---------|
+| **系统可用性** | >95% | >99% | >99.9% | 监控系统 | (总时间-故障时间)/总时间 |
+| **平均故障恢复时间（MTTR）** | <4小时 | <2小时 | <1小时 | 运维日志 | 故障恢复总时间/故障次数 |
+| **平均故障间隔时间（MTBF）** | >168小时 | >336小时 | >720小时 | 运维日志 | 总运行时间/故障次数 |
+
+**详细可用性指标**:
+
+*可用性计算*:
+- **MVP（95%）**：
+  - 每月允许故障时间：36小时
+  - 每周允许故障时间：8.4小时
+  - 每天允许故障时间：1.2小时
+- **V1.0（99%）**：
+  - 每月允许故障时间：7.2小时
+  - 每周允许故障时间：1.68小时
+  - 每天允许故障时间：14.4分钟
+- **V2.0（99.9%）**：
+  - 每月允许故障时间：43.2分钟
+  - 每周允许故障时间：10.1分钟
+  - 每天允许故障时间：1.44分钟
+
+*监控指标*:
+- **健康检查**：
+  - 检查频率：每30秒
+  - 检查内容：API可用性、数据库连接、Redis连接、Docker服务
+  - 告警阈值：连续3次失败
+- **自动恢复**：
+  - 服务自动重启：失败后自动重启（最多3次）
+  - 容器自动清理：执行完成后自动删除
+  - 数据库连接池：自动重连
 
 **资源使用要求**:
 
-| 资源 | MVP目标 | V1.0目标 | V2.0目标 | 说明 |
-|------|---------|----------|----------|------|
-| **CPU使用率** | <70% | <60% | <50% | 平均使用率 |
-| **内存使用率** | <80% | <70% | <60% | 平均使用率 |
-| **磁盘使用率** | <70% | <60% | <50% | 平均使用率 |
-| **网络带宽** | <100Mbps | <200Mbps | <500Mbps | 峰值带宽 |
+| 资源 | MVP目标 | V1.0目标 | V2.0目标 | 说明 | 监控工具 |
+|------|---------|----------|----------|------|---------|
+| **CPU使用率** | <70% | <60% | <50% | 平均使用率 | Prometheus |
+| **内存使用率** | <80% | <70% | <60% | 平均使用率 | Prometheus |
+| **磁盘使用率** | <70% | <60% | <50% | 平均使用率 | Prometheus |
+| **网络带宽** | <100Mbps | <200Mbps | <500Mbps | 峰值带宽 | Prometheus |
+
+**详细资源指标**:
+
+*服务器配置（MVP）*:
+- **CPU**: 4核
+- **内存**: 8GB
+- **磁盘**: 100GB SSD
+- **网络**: 100Mbps
+
+*资源分配*:
+- **Web服务**（Flask）：
+  - CPU: 1核
+  - 内存: 2GB
+- **数据库**（SQLite/MySQL）：
+  - CPU: 1核
+  - 内存: 2GB
+- **缓存**（Redis）：
+  - CPU: 0.5核
+  - 内存: 1GB
+- **任务队列**（Celery）：
+  - CPU: 0.5核
+  - 内存: 1GB
+- **代码执行**（Docker容器）：
+  - CPU: 1核（共享，最多20个容器）
+  - 内存: 256MB/容器（最多20个容器 = 5GB）
+
+*资源告警*:
+- **CPU使用率 >80%**：发送告警，考虑扩容
+- **内存使用率 >90%**：发送告警，考虑扩容
+- **磁盘使用率 >80%**：发送告警，清理日志和临时文件
+- **网络带宽 >80%**：发送告警，考虑升级带宽
+
+**性能优化策略**:
+
+*前端优化*:
+- **代码分割**：按路由分割代码，减少首屏加载时间
+- **懒加载**：图片、组件按需加载
+- **CDN加速**：静态资源使用CDN
+- **Gzip压缩**：压缩HTML、CSS、JS文件
+- **浏览器缓存**：设置合理的缓存策略
+
+*后端优化*:
+- **数据库索引**：为常用查询字段添加索引
+- **查询优化**：避免N+1查询，使用JOIN优化
+- **Redis缓存**：缓存热点数据（题目列表、用户信息）
+- **连接池**：使用数据库连接池，减少连接开销
+- **异步处理**：代码执行、邮件发送使用异步任务
+
+*代码执行优化*:
+- **容器复用**：预创建容器池，减少启动时间
+- **并发控制**：限制并发执行数，防止资源耗尽
+- **超时控制**：设置合理的超时时间，防止资源占用
+- **资源回收**：执行完成后立即删除容器，释放资源
 
 
 ### 6.2 安全需求
 
 **代码执行安全**:
 
-| 安全措施 | 配置 | 说明 |
-|---------|------|------|
-| **Docker容器隔离** | 每次执行独立容器 | 防止代码互相干扰 |
-| **CPU限制** | 1核 | 防止CPU占用过高 |
-| **内存限制** | 256MB | 防止内存溢出 |
-| **磁盘限制** | 100MB | 防止磁盘占用过高 |
-| **网络隔离** | 禁止访问外网 | 防止恶意代码访问外部资源 |
-| **执行超时** | 5秒 | 防止无限循环 |
-| **危险操作拦截** | 禁止import os, subprocess等 | 防止系统调用 |
-| **文件系统隔离** | 只读文件系统 | 防止文件篡改 |
+| 安全措施 | 配置 | 说明 | 实现方式 |
+|---------|------|------|---------|
+| **Docker容器隔离** | 每次执行独立容器 | 防止代码互相干扰 | docker run --rm |
+| **CPU限制** | 1核 | 防止CPU占用过高 | --cpu-quota=100000 |
+| **内存限制** | 256MB | 防止内存溢出 | --memory=256m |
+| **磁盘限制** | 100MB | 防止磁盘占用过高 | --storage-opt size=100m |
+| **网络隔离** | 禁止访问外网 | 防止恶意代码访问外部资源 | --network=none |
+| **执行超时** | 5秒 | 防止无限循环 | timeout 5s |
+| **危险操作拦截** | 禁止import os, subprocess等 | 防止系统调用 | 代码静态分析 |
+| **文件系统隔离** | 只读文件系统 | 防止文件篡改 | --read-only |
+| **非root用户** | sandbox用户（UID 1000） | 防止提权 | --user=sandbox |
+| **禁用capabilities** | 移除所有capabilities | 防止系统调用 | --cap-drop=ALL |
+| **进程数限制** | 最多50个进程 | 防止fork炸弹 | --pids-limit=50 |
+| **文件描述符限制** | 最多64个 | 防止资源耗尽 | --ulimit nofile=64 |
+
+**详细代码执行安全措施**:
+
+*危险操作检测*:
+```python
+# 禁止的模块
+DANGEROUS_MODULES = [
+    'os', 'sys', 'subprocess', 'socket', 'urllib', 'urllib2', 'urllib3',
+    'requests', 'http', 'httplib', 'ftplib', 'smtplib', 'telnetlib',
+    'pickle', 'shelve', 'marshal', 'ctypes', 'cffi',
+    'multiprocessing', 'threading', 'asyncio',
+    '__import__', 'importlib', 'imp'
+]
+
+# 禁止的内置函数
+DANGEROUS_BUILTINS = [
+    'eval', 'exec', 'compile', '__import__',
+    'open', 'file', 'input', 'raw_input',
+    'execfile', 'reload', 'vars', 'dir', 'globals', 'locals'
+]
+
+# 禁止的关键字
+DANGEROUS_KEYWORDS = [
+    '__builtins__', '__globals__', '__locals__',
+    '__code__', '__class__', '__bases__', '__subclasses__'
+]
+```
+
+*检测流程*:
+```
+1. 接收用户代码
+2. 使用AST（抽象语法树）解析代码
+3. 检测import语句（禁止导入危险模块）
+4. 检测函数调用（禁止调用危险函数）
+5. 检测属性访问（禁止访问危险属性）
+6. 检测失败：返回错误"代码包含危险操作，禁止执行"
+7. 检测通过：继续执行
+```
+
+*容器安全配置*:
+```python
+container_security_config = {
+    # 资源限制
+    'mem_limit': '256m',
+    'memswap_limit': '256m',
+    'cpu_quota': 100000,
+    'cpu_period': 100000,
+    'pids_limit': 50,
+
+    # 网络隔离
+    'network_disabled': True,
+
+    # 文件系统
+    'read_only': True,
+    'tmpfs': {'/tmp': 'size=10m,mode=1777'},
+
+    # 用户权限
+    'user': 'sandbox:sandbox',
+
+    # 安全选项
+    'security_opt': [
+        'no-new-privileges',
+        'seccomp=unconfined'  # 可选：使用自定义seccomp配置
+    ],
+
+    # Capabilities
+    'cap_drop': ['ALL'],
+
+    # 资源限制
+    'ulimits': [
+        {'name': 'nofile', 'soft': 64, 'hard': 64},
+        {'name': 'nproc', 'soft': 50, 'hard': 50}
+    ],
+
+    # 自动删除
+    'remove': True,
+    'detach': False
+}
+```
 
 **数据安全**:
 
-| 安全措施 | 配置 | 说明 |
-|---------|------|------|
-| **密码加密** | BCrypt（cost=12） | 防止密码泄露 |
-| **JWT Token认证** | 有效期24小时 | 防止会话劫持 |
-| **SQL注入防护** | 使用ORM（SQLAlchemy） | 防止SQL注入 |
-| **XSS攻击防护** | 输入过滤+输出转义 | 防止XSS攻击 |
-| **CSRF防护** | Token验证 | 防止CSRF攻击 |
-| **数据备份** | 每日自动备份 | 防止数据丢失 |
-| **数据加密** | AES-256加密（敏感数据） | 防止数据泄露 |
+| 安全措施 | 配置 | 说明 | 实现方式 |
+|---------|------|------|---------|
+| **密码加密** | BCrypt（cost=12） | 防止密码泄露 | bcrypt.hashpw() |
+| **JWT Token认证** | 有效期24小时 | 防止会话劫持 | PyJWT |
+| **SQL注入防护** | 使用ORM（SQLAlchemy） | 防止SQL注入 | 参数化查询 |
+| **XSS攻击防护** | 输入过滤+输出转义 | 防止XSS攻击 | bleach.clean() |
+| **CSRF防护** | Token验证 | 防止CSRF攻击 | Flask-WTF |
+| **数据备份** | 每日自动备份 | 防止数据丢失 | cron + rsync |
+| **数据加密** | AES-256加密（敏感数据） | 防止数据泄露 | cryptography |
+| **HTTPS加密** | TLS 1.2+ | 防止中间人攻击 | Let's Encrypt |
+| **敏感信息脱敏** | 日志中隐藏密码、Token | 防止信息泄露 | 正则替换 |
+
+**详细数据安全措施**:
+
+*密码安全*:
+- **密码强度要求**：
+  - 长度：8-32字符
+  - 复杂度：至少包含大写字母、小写字母、数字、特殊字符中的3种
+  - 禁止常见密码：123456、password、qwerty等
+- **密码加密**：
+  - 算法：BCrypt
+  - Cost因子：12（2^12 = 4096次迭代）
+  - 盐值：自动生成（随机）
+- **密码重置**：
+  - 重置Token：UUID v4（128位随机）
+  - 有效期：1小时
+  - 单次使用：使用后立即失效
+
+*Token安全*:
+- **JWT Token**：
+  - 算法：HS256（HMAC-SHA256）
+  - 密钥：256位随机密钥（环境变量）
+  - 有效期：24小时（记住我：7天）
+  - 刷新机制：Token过期前1小时可刷新
+- **Token存储**：
+  - 前端：localStorage（仅HTTPS）
+  - 后端：Redis（黑名单）
+- **Token撤销**：
+  - 登出：将Token加入黑名单
+  - 密码修改：撤销所有Token
+
+*数据备份*:
+- **备份策略**：
+  - 全量备份：每天凌晨2点
+  - 增量备份：每6小时
+  - 保留策略：最近7天全量备份 + 最近30天增量备份
+- **备份内容**：
+  - 数据库：SQLite/MySQL数据文件
+  - 用户上传文件：头像、题目附件
+  - 配置文件：环境变量、配置文件
+- **备份验证**：
+  - 每周验证备份可恢复性
+  - 记录验证结果
 
 **访问控制**:
 
-| 安全措施 | 配置 | 说明 |
-|---------|------|------|
-| **基于角色的权限控制（RBAC）** | 学生/教师/管理员 | 防止越权访问 |
-| **API访问限流** | 100次/分钟 | 防止API滥用 |
-| **登录失败锁定** | 5次失败锁定30分钟 | 防止暴力破解 |
-| **IP黑白名单** | 可选 | 防止恶意访问 |
-| **会话管理** | 单点登录、自动登出 | 防止会话泄露 |
+| 安全措施 | 配置 | 说明 | 实现方式 |
+|---------|------|------|---------|
+| **基于角色的权限控制（RBAC）** | 学生/教师/管理员 | 防止越权访问 | Flask-Principal |
+| **API访问限流** | 100次/分钟 | 防止API滥用 | Flask-Limiter |
+| **登录失败锁定** | 5次失败锁定30分钟 | 防止暴力破解 | Redis计数器 |
+| **IP黑白名单** | 可选 | 防止恶意访问 | Nginx配置 |
+| **会话管理** | 单点登录、自动登出 | 防止会话泄露 | Redis存储 |
+| **CORS配置** | 仅允许特定域名 | 防止跨域攻击 | Flask-CORS |
+| **Content Security Policy** | 限制资源加载 | 防止XSS攻击 | HTTP头 |
+
+**详细访问控制措施**:
+
+*RBAC权限矩阵*:
+
+| 资源 | 学生 | 教师 | 管理员 |
+|------|------|------|--------|
+| **题目列表** | 查看 | 查看、创建、编辑、删除 | 全部权限 |
+| **题目详情** | 查看（不含答案） | 查看（含答案） | 全部权限 |
+| **代码提交** | 提交自己的代码 | 查看所有提交 | 全部权限 |
+| **班级管理** | 加入班级 | 创建、编辑、删除班级 | 全部权限 |
+| **作业管理** | 提交作业 | 创建、编辑、删除作业 | 全部权限 |
+| **用户管理** | 查看自己的信息 | 查看班级学生信息 | 全部权限 |
+| **系统设置** | 无权限 | 无权限 | 全部权限 |
+
+*API限流策略*:
+- **全局限流**：
+  - 匿名用户：10次/分钟
+  - 登录用户：100次/分钟
+  - 管理员：1000次/分钟
+- **接口限流**：
+  - 登录接口：5次/分钟
+  - 注册接口：3次/小时
+  - 代码执行：10次/分钟
+  - 文件上传：5次/小时
+- **限流响应**：
+  - HTTP状态码：429 Too Many Requests
+  - 响应头：X-RateLimit-Limit、X-RateLimit-Remaining、X-RateLimit-Reset
+  - 响应体：{"error": "请求过于频繁，请稍后重试"}
+
+*登录安全*:
+- **登录失败锁定**：
+  - 失败次数：5次
+  - 锁定时间：30分钟
+  - 锁定提示："账号已被锁定，请30分钟后再试"
+- **登录验证码**：
+  - 触发条件：登录失败3次
+  - 验证码类型：图形验证码（4位数字+字母）
+  - 有效期：5分钟
+- **异常登录检测**：
+  - 检测异常IP（不同地区）
+  - 检测异常设备（不同浏览器）
+  - 发送邮件通知用户
 
 **安全审计**:
 
-| 审计内容 | 记录内容 | 保留时间 |
-|---------|---------|---------|
-| **登录日志** | 用户、IP、时间、结果 | 90天 |
-| **操作日志** | 用户、操作、时间、结果 | 90天 |
-| **异常日志** | 异常类型、堆栈、时间 | 30天 |
-| **安全事件** | 事件类型、详情、时间 | 365天 |
+| 审计内容 | 记录内容 | 保留时间 | 存储位置 | 用途 |
+|---------|---------|---------|---------|------|
+| **登录日志** | 用户、IP、时间、结果、User-Agent | 90天 | MySQL | 安全审计、异常检测 |
+| **操作日志** | 用户、操作、时间、结果、参数 | 90天 | MySQL | 操作追溯、问题排查 |
+| **异常日志** | 异常类型、堆栈、时间、请求信息 | 30天 | 文件 | 问题排查、性能优化 |
+| **安全事件** | 事件类型、详情、时间、IP | 365天 | MySQL | 安全分析、合规审计 |
+| **代码执行日志** | 用户、代码、结果、时间 | 30天 | MySQL | 问题排查、滥用检测 |
+
+**详细安全审计措施**:
+
+*日志格式*:
+```json
+{
+  "timestamp": "2025-11-07T10:00:00Z",
+  "level": "INFO",
+  "type": "login",
+  "user_id": 123,
+  "username": "student@example.com",
+  "ip": "192.168.1.100",
+  "user_agent": "Mozilla/5.0...",
+  "result": "success",
+  "message": "用户登录成功"
+}
+```
+
+*安全事件类型*:
+- **登录失败**：记录失败原因（密码错误、账号不存在、账号锁定）
+- **越权访问**：记录访问的资源和权限
+- **危险代码**：记录危险操作类型和代码片段
+- **API滥用**：记录超出限流的请求
+- **异常登录**：记录异常IP、异常设备
+- **数据泄露**：记录敏感数据访问（如批量导出）
+
+*日志分析*:
+- **实时监控**：使用ELK（Elasticsearch + Logstash + Kibana）分析日志
+- **异常告警**：
+  - 登录失败率 >10%：发送告警
+  - 代码执行失败率 >20%：发送告警
+  - API错误率 >5%：发送告警
+- **定期审计**：
+  - 每周生成安全审计报告
+  - 每月生成合规审计报告
 
 ### 6.3 可用性需求
 
@@ -3107,22 +4642,286 @@ Docker环境 → F3 ↗
 - ✅ 响应式设计，支持PC和平板（屏幕宽度 ≥768px）
 - ✅ 键盘快捷键支持（Ctrl+S保存、Ctrl+/注释、Ctrl+Enter运行等）
 
+**详细界面设计规范**:
+
+*布局规范*:
+- **导航栏**：
+  - 高度：60px
+  - 背景色：#1890ff（主题色）
+  - Logo：左侧，40px × 40px
+  - 菜单：中间，水平排列
+  - 用户信息：右侧，头像 + 用户名
+- **侧边栏**（可选）：
+  - 宽度：200px（展开）、60px（收起）
+  - 背景色：#001529（深色）
+  - 菜单项：图标 + 文字
+- **内容区**：
+  - 最大宽度：1200px
+  - 内边距：24px
+  - 背景色：#f0f2f5（浅灰）
+- **卡片**：
+  - 圆角：4px
+  - 阴影：0 2px 8px rgba(0,0,0,0.1)
+  - 内边距：16px
+
+*颜色规范*:
+- **主题色**：#1890ff（蓝色）
+- **成功色**：#52c41a（绿色）
+- **警告色**：#faad14（橙色）
+- **错误色**：#f5222d（红色）
+- **文本色**：
+  - 主要文本：rgba(0,0,0,0.85)
+  - 次要文本：rgba(0,0,0,0.65)
+  - 禁用文本：rgba(0,0,0,0.25)
+- **背景色**：
+  - 页面背景：#f0f2f5
+  - 卡片背景：#ffffff
+  - 悬停背景：#e6f7ff
+
+*字体规范*:
+- **字体家族**：-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif
+- **字体大小**：
+  - 标题1：24px
+  - 标题2：20px
+  - 标题3：16px
+  - 正文：14px
+  - 小字：12px
+- **行高**：1.5
+- **字重**：
+  - 正常：400
+  - 加粗：600
+
+*交互规范*:
+- **按钮**：
+  - 主按钮：蓝色背景，白色文字
+  - 次按钮：白色背景，蓝色边框
+  - 危险按钮：红色背景，白色文字
+  - 禁用按钮：灰色背景，灰色文字
+  - 悬停效果：颜色加深10%
+  - 点击效果：缩放0.95
+- **输入框**：
+  - 边框：1px solid #d9d9d9
+  - 聚焦边框：1px solid #1890ff
+  - 错误边框：1px solid #f5222d
+  - 高度：32px
+  - 圆角：2px
+- **下拉菜单**：
+  - 最大高度：256px
+  - 滚动条：自动显示
+  - 选中项：蓝色背景
+- **模态框**：
+  - 遮罩：rgba(0,0,0,0.45)
+  - 宽度：520px（小）、720px（中）、1000px（大）
+  - 圆角：4px
+  - 关闭按钮：右上角
+
+*错误提示规范*:
+- **表单验证错误**：
+  - 位置：输入框下方
+  - 颜色：红色
+  - 图标：感叹号
+  - 示例："邮箱格式不正确"
+- **操作失败提示**：
+  - 类型：Toast（顶部居中）
+  - 持续时间：3秒
+  - 颜色：红色
+  - 示例："保存失败，请稍后重试"
+- **系统错误提示**：
+  - 类型：模态框
+  - 标题："系统错误"
+  - 内容：错误信息 + 错误代码
+  - 操作：刷新页面、联系客服
+
 **可访问性**:
 - ✅ 支持键盘导航
 - ✅ 支持屏幕阅读器（ARIA标签）
 - ✅ 颜色对比度符合WCAG 2.1 AA标准
 - ✅ 字体大小可调整（12px-18px）
 
+**详细可访问性规范**:
+
+*键盘导航*:
+- **Tab键**：在可交互元素间切换
+- **Enter键**：激活按钮、链接
+- **Esc键**：关闭模态框、下拉菜单
+- **方向键**：在列表、菜单中导航
+- **快捷键**：
+  - Ctrl+S：保存
+  - Ctrl+/：注释/取消注释
+  - Ctrl+Enter：运行代码
+  - Ctrl+F：搜索
+  - Ctrl+Z：撤销
+  - Ctrl+Y：重做
+
+*ARIA标签*:
+```html
+<!-- 按钮 -->
+<button aria-label="运行代码" aria-describedby="run-code-desc">
+  <i class="icon-play"></i>
+</button>
+<span id="run-code-desc" class="sr-only">点击运行当前代码</span>
+
+<!-- 输入框 -->
+<input
+  type="text"
+  aria-label="邮箱"
+  aria-required="true"
+  aria-invalid="false"
+  aria-describedby="email-error"
+/>
+<span id="email-error" role="alert" aria-live="polite"></span>
+
+<!-- 模态框 -->
+<div role="dialog" aria-labelledby="modal-title" aria-modal="true">
+  <h2 id="modal-title">创建班级</h2>
+  ...
+</div>
+```
+
+*颜色对比度*:
+- **正常文本**（14px）：对比度 ≥4.5:1
+- **大文本**（18px+）：对比度 ≥3:1
+- **图标**：对比度 ≥3:1
+- **检测工具**：Chrome DevTools Lighthouse
+
+*字体大小调整*:
+- **默认大小**：14px
+- **可调范围**：12px-18px
+- **调整方式**：用户设置页面
+- **保存方式**：localStorage
+
 **国际化**:
 - ✅ 支持中文（简体）
 - ⏳ 支持英文（V2.0）
 - ⏳ 支持多语言切换（V2.0）
+
+**详细国际化规范**:
+
+*语言支持*:
+- **MVP**：中文（简体）
+- **V1.0**：中文（简体）、英文
+- **V2.0**：中文（简体/繁体）、英文、日文、韩文
+
+*实现方式*:
+- **前端**：Vue I18n
+- **后端**：Flask-Babel
+- **翻译文件**：JSON格式
+- **示例**：
+```json
+{
+  "zh-CN": {
+    "common": {
+      "save": "保存",
+      "cancel": "取消",
+      "delete": "删除"
+    },
+    "login": {
+      "title": "登录",
+      "email": "邮箱",
+      "password": "密码",
+      "submit": "登录"
+    }
+  },
+  "en-US": {
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "login": {
+      "title": "Login",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Login"
+    }
+  }
+}
+```
+
+*语言切换*:
+- **切换位置**：导航栏右上角
+- **切换方式**：下拉菜单
+- **保存方式**：localStorage + 用户设置
+- **默认语言**：浏览器语言（navigator.language）
 
 **用户体验**:
 - ✅ 页面加载时显示加载动画
 - ✅ 操作成功/失败显示Toast提示
 - ✅ 表单验证实时反馈
 - ✅ 长时间操作显示进度条
+
+**详细用户体验规范**:
+
+*加载状态*:
+- **页面加载**：
+  - 类型：全屏加载动画（Spin）
+  - 位置：页面中心
+  - 文字："加载中..."
+- **局部加载**：
+  - 类型：骨架屏（Skeleton）
+  - 位置：内容区域
+  - 动画：闪烁效果
+- **按钮加载**：
+  - 类型：按钮内Spin
+  - 禁用按钮：防止重复点击
+  - 文字："提交中..."
+
+*Toast提示*:
+- **成功提示**：
+  - 图标：✓（绿色）
+  - 示例："保存成功"
+  - 持续时间：2秒
+- **失败提示**：
+  - 图标：✗（红色）
+  - 示例："保存失败，请稍后重试"
+  - 持续时间：3秒
+- **警告提示**：
+  - 图标：⚠（橙色）
+  - 示例："该操作不可撤销，请谨慎操作"
+  - 持续时间：3秒
+- **信息提示**：
+  - 图标：ℹ（蓝色）
+  - 示例："代码已保存到草稿箱"
+  - 持续时间：2秒
+
+*表单验证*:
+- **实时验证**：
+  - 触发时机：失去焦点（blur）
+  - 验证规则：必填、格式、长度
+  - 错误提示：输入框下方，红色文字
+- **提交验证**：
+  - 触发时机：点击提交按钮
+  - 验证所有字段
+  - 滚动到第一个错误字段
+  - 聚焦到错误字段
+
+*进度条*:
+- **代码执行进度**：
+  - 类型：环形进度条
+  - 位置：运行按钮旁边
+  - 文字："执行中... 3/5"
+- **文件上传进度**：
+  - 类型：线性进度条
+  - 位置：上传区域
+  - 百分比：0-100%
+- **作业完成进度**：
+  - 类型：进度条
+  - 位置：作业卡片
+  - 文字："已完成 3/5 题"
+
+*空状态*:
+- **无数据**：
+  - 图标：空文件夹
+  - 文字："暂无数据"
+  - 操作：创建按钮
+- **搜索无结果**：
+  - 图标：搜索
+  - 文字："未找到相关内容"
+  - 建议："尝试其他关键词"
+- **网络错误**：
+  - 图标：断网
+  - 文字："网络连接失败"
+  - 操作：重试按钮
 
 ### 6.4 可维护性需求
 
@@ -3132,11 +4931,170 @@ Docker环境 → F3 ↗
 - ✅ 代码注释覆盖率 ≥30%
 - ✅ 关键逻辑必须注释
 
+**详细代码规范**:
+
+*Python代码规范（PEP 8）*:
+- **缩进**：4个空格
+- **行长度**：最大79字符（文档字符串/注释最大72字符）
+- **空行**：
+  - 顶层函数和类定义之间：2个空行
+  - 类内方法定义之间：1个空行
+- **导入**：
+  - 顺序：标准库 → 第三方库 → 本地库
+  - 每个导入独立一行
+  - 使用绝对导入
+- **命名**：
+  - 类名：PascalCase（如UserService）
+  - 函数名：snake_case（如get_user_by_id）
+  - 常量：UPPER_CASE（如MAX_RETRY_COUNT）
+  - 私有变量：_leading_underscore（如_internal_cache）
+- **字符串**：优先使用单引号（'hello'）
+- **检查工具**：flake8、black、pylint
+
+*JavaScript代码规范（ESLint）*:
+- **缩进**：2个空格
+- **分号**：必须使用
+- **引号**：单引号
+- **命名**：
+  - 变量/函数：camelCase（如getUserById）
+  - 类名：PascalCase（如UserService）
+  - 常量：UPPER_CASE（如MAX_RETRY_COUNT）
+- **箭头函数**：优先使用箭头函数
+- **模板字符串**：优先使用模板字符串
+- **检查工具**：ESLint + Prettier
+
+*注释规范*:
+- **文件注释**：
+```python
+"""
+用户服务模块
+
+提供用户注册、登录、信息管理等功能
+
+Author: pythonLearn Team
+Date: 2025-11-07
+"""
+```
+
+- **类注释**：
+```python
+class UserService:
+    """
+    用户服务类
+
+    提供用户相关的业务逻辑处理
+
+    Attributes:
+        db: 数据库连接
+        cache: Redis缓存
+    """
+```
+
+- **函数注释**：
+```python
+def get_user_by_id(user_id: int) -> Optional[User]:
+    """
+    根据用户ID获取用户信息
+
+    Args:
+        user_id: 用户ID
+
+    Returns:
+        User对象，如果不存在返回None
+
+    Raises:
+        DatabaseError: 数据库查询失败
+    """
+```
+
+- **行内注释**：
+```python
+# 检查用户是否已锁定
+if user.is_locked:
+    return {"error": "账号已被锁定"}
+```
+
 **代码质量**:
 - ✅ 单元测试覆盖率 ≥80%
 - ✅ 集成测试覆盖率 ≥60%
 - ✅ 代码审查：所有代码必须经过Code Review
 - ✅ 代码复杂度：圈复杂度 ≤10
+
+**详细代码质量要求**:
+
+*单元测试*:
+- **测试框架**：
+  - Python：pytest
+  - JavaScript：Jest
+- **覆盖率目标**：
+  - 核心业务逻辑：≥90%
+  - 工具函数：≥80%
+  - UI组件：≥60%
+- **测试类型**：
+  - 正常流程测试
+  - 边界条件测试
+  - 异常情况测试
+- **测试示例**：
+```python
+def test_user_login_success():
+    """测试用户登录成功"""
+    user = create_test_user()
+    result = login(user.email, 'password123')
+    assert result['success'] is True
+    assert 'token' in result
+
+def test_user_login_wrong_password():
+    """测试用户登录密码错误"""
+    user = create_test_user()
+    result = login(user.email, 'wrong_password')
+    assert result['success'] is False
+    assert result['error'] == '密码错误'
+```
+
+*集成测试*:
+- **测试框架**：pytest + Flask test client
+- **测试范围**：
+  - API接口测试
+  - 数据库操作测试
+  - 第三方服务集成测试
+- **测试示例**：
+```python
+def test_create_assignment_api(client, auth_token):
+    """测试创建作业API"""
+    response = client.post('/api/assignments',
+        headers={'Authorization': f'Bearer {auth_token}'},
+        json={
+            'class_id': 1,
+            'title': '第1周作业',
+            'problem_ids': [1, 2, 3],
+            'deadline': '2025-11-14T23:59:59Z'
+        }
+    )
+    assert response.status_code == 201
+    assert response.json['id'] > 0
+```
+
+*代码审查*:
+- **审查流程**：
+  1. 开发者提交Pull Request
+  2. 自动运行CI/CD（测试、代码检查）
+  3. 至少1名团队成员审查代码
+  4. 审查通过后合并到主分支
+- **审查要点**：
+  - 代码是否符合规范
+  - 逻辑是否正确
+  - 是否有安全隐患
+  - 是否有性能问题
+  - 测试是否充分
+  - 注释是否清晰
+
+*代码复杂度*:
+- **圈复杂度**：≤10
+- **检测工具**：radon（Python）、complexity-report（JavaScript）
+- **优化建议**：
+  - 提取复杂逻辑到独立函数
+  - 使用策略模式替代多层if-else
+  - 使用字典/映射替代switch-case
 
 **文档完整性**:
 - ✅ API文档（Swagger/OpenAPI）
@@ -3145,11 +5103,118 @@ Docker环境 → F3 ↗
 - ✅ 开发文档（README.md）
 - ✅ 数据库设计文档（ER图）
 
+**详细文档要求**:
+
+*API文档*:
+- **工具**：Swagger UI + OpenAPI 3.0
+- **内容**：
+  - 接口路径和方法
+  - 请求参数（路径参数、查询参数、请求体）
+  - 响应格式（成功、失败）
+  - 状态码说明
+  - 示例请求和响应
+- **访问地址**：http://localhost:5000/api/docs
+
+*用户手册*:
+- **格式**：Markdown
+- **内容**：
+  - 产品介绍
+  - 快速开始
+  - 功能说明（注册登录、题目练习、班级管理、作业系统）
+  - 常见问题（FAQ）
+  - 联系方式
+- **位置**：docs/USER_MANUAL.md
+
+*部署文档*:
+- **格式**：Markdown
+- **内容**：
+  - 系统要求
+  - 安装步骤
+  - 配置说明
+  - 启动命令
+  - 常见问题
+  - 升级指南
+  - 备份恢复
+- **位置**：docs/DEPLOYMENT.md
+
+*开发文档*:
+- **格式**：Markdown
+- **内容**：
+  - 项目介绍
+  - 技术栈
+  - 目录结构
+  - 开发环境搭建
+  - 开发规范
+  - 测试指南
+  - 贡献指南
+- **位置**：README.md
+
+*数据库设计文档*:
+- **工具**：dbdiagram.io
+- **内容**：
+  - ER图
+  - 表结构说明
+  - 字段说明
+  - 索引说明
+  - 关系说明
+- **位置**：docs/DATABASE_DESIGN.md
+
 **版本控制**:
 - ✅ 使用Git进行版本控制
 - ✅ 使用语义化版本号（Semantic Versioning）
 - ✅ 使用Git Flow工作流
 - ✅ 每个功能使用独立分支
+
+**详细版本控制规范**:
+
+*Git Flow工作流*:
+- **主分支**：
+  - main：生产环境代码
+  - develop：开发环境代码
+- **功能分支**：
+  - feature/功能名：新功能开发
+  - 示例：feature/user-login
+- **修复分支**：
+  - bugfix/问题描述：Bug修复
+  - 示例：bugfix/login-error
+- **发布分支**：
+  - release/版本号：发布准备
+  - 示例：release/v1.0.0
+- **热修复分支**：
+  - hotfix/问题描述：紧急修复
+  - 示例：hotfix/security-patch
+
+*提交规范*:
+- **格式**：`<type>(<scope>): <subject>`
+- **类型**：
+  - feat：新功能
+  - fix：Bug修复
+  - docs：文档更新
+  - style：代码格式（不影响功能）
+  - refactor：重构
+  - test：测试
+  - chore：构建/工具
+- **示例**：
+  - `feat(auth): 添加用户登录功能`
+  - `fix(editor): 修复代码高亮错误`
+  - `docs(api): 更新API文档`
+
+*语义化版本号*:
+- **格式**：MAJOR.MINOR.PATCH
+- **规则**：
+  - MAJOR：不兼容的API修改
+  - MINOR：向下兼容的功能新增
+  - PATCH：向下兼容的Bug修复
+- **示例**：
+  - v0.1.0：MVP版本
+  - v1.0.0：正式版本
+  - v1.1.0：新增功能
+  - v1.1.1：Bug修复
+
+*标签管理*:
+- **发布标签**：v1.0.0、v1.1.0
+- **里程碑标签**：mvp、v1.0、v2.0
+- **创建命令**：`git tag -a v1.0.0 -m "Release v1.0.0"`
 
 ### 6.5 可扩展性需求
 
@@ -3159,11 +5224,197 @@ Docker环境 → F3 ↗
 - ✅ 数据库设计规范，支持迁移（SQLite→MySQL）
 - ✅ 支持水平扩展（负载均衡）
 
+**详细架构设计**:
+
+*模块化设计*:
+- **前端模块**：
+  - 用户模块（auth）：注册、登录、个人中心
+  - 题目模块（problem）：题目列表、题目详情、代码编辑
+  - 班级模块（class）：班级管理、成员管理、公告
+  - 作业模块（assignment）：作业管理、提交、统计
+  - 通用模块（common）：布局、组件、工具
+- **后端模块**：
+  - 用户模块（auth）：认证、授权、用户管理
+  - 题目模块（problem）：题目CRUD、代码执行
+  - 班级模块（class）：班级CRUD、成员管理
+  - 作业模块（assignment）：作业CRUD、批改、统计
+  - 通用模块（common）：数据库、缓存、日志
+
+*模块依赖关系*:
+```
+auth (基础模块)
+  ↓
+problem (依赖auth)
+  ↓
+class (依赖auth)
+  ↓
+assignment (依赖auth + problem + class)
+```
+
+*接口设计原则*:
+- **RESTful API**：
+  - 使用HTTP方法：GET（查询）、POST（创建）、PUT（更新）、DELETE（删除）
+  - 使用资源路径：/api/users、/api/problems、/api/classes
+  - 使用HTTP状态码：200（成功）、201（创建）、400（错误）、401（未授权）、404（不存在）
+- **版本控制**：
+  - URL版本：/api/v1/users、/api/v2/users
+  - 向下兼容：保留旧版本API至少6个月
+- **统一响应格式**：
+```json
+{
+  "success": true,
+  "data": {...},
+  "error": null,
+  "timestamp": "2025-11-07T10:00:00Z"
+}
+```
+
+*数据库设计规范*:
+- **命名规范**：
+  - 表名：复数形式（users、problems、classes）
+  - 字段名：snake_case（user_id、created_at）
+  - 索引名：idx_表名_字段名（idx_users_email）
+- **设计原则**：
+  - 第三范式（3NF）
+  - 外键约束
+  - 索引优化
+  - 软删除（is_deleted字段）
+- **迁移支持**：
+  - 使用Alembic管理数据库迁移
+  - 每次修改生成迁移脚本
+  - 支持升级和回滚
+
 **功能扩展**:
 - ✅ 支持新题型扩展（选择题、填空题、项目题）
 - ✅ 支持新语言扩展（Java、C++、JavaScript）
 - ✅ 支持插件系统（V2.0）
 - ✅ 支持第三方集成（OAuth、LMS）
+
+**详细功能扩展设计**:
+
+*新题型扩展*:
+- **编程题**（MVP）：
+  - 类型：code
+  - 评判：运行测试用例
+  - 分数：通过测试用例数/总测试用例数 × 100
+- **选择题**（V1.0）：
+  - 类型：choice
+  - 评判：对比答案
+  - 分数：正确100分，错误0分
+- **填空题**（V1.0）：
+  - 类型：fill_blank
+  - 评判：对比答案（支持正则）
+  - 分数：正确100分，错误0分
+- **项目题**（V2.0）：
+  - 类型：project
+  - 评判：人工评分 + 自动测试
+  - 分数：0-100分
+
+*题型扩展接口*:
+```python
+class ProblemType(ABC):
+    """题型基类"""
+
+    @abstractmethod
+    def validate(self, problem_data: dict) -> bool:
+        """验证题目数据"""
+        pass
+
+    @abstractmethod
+    def judge(self, submission_data: dict) -> dict:
+        """评判提交"""
+        pass
+
+class CodeProblem(ProblemType):
+    """编程题"""
+
+    def validate(self, problem_data: dict) -> bool:
+        # 验证测试用例
+        return 'test_cases' in problem_data
+
+    def judge(self, submission_data: dict) -> dict:
+        # 运行代码，返回结果
+        return execute_code(submission_data['code'])
+```
+
+*新语言扩展*:
+- **Python**（MVP）：
+  - 镜像：python:3.8-slim
+  - 执行：python /app/code.py
+- **Java**（V1.0）：
+  - 镜像：openjdk:11-slim
+  - 执行：javac Main.java && java Main
+- **C++**（V1.0）：
+  - 镜像：gcc:11-slim
+  - 执行：g++ -o main main.cpp && ./main
+- **JavaScript**（V1.0）：
+  - 镜像：node:16-slim
+  - 执行：node /app/code.js
+
+*语言扩展接口*:
+```python
+class Language(ABC):
+    """语言基类"""
+
+    @abstractmethod
+    def get_docker_image(self) -> str:
+        """获取Docker镜像"""
+        pass
+
+    @abstractmethod
+    def get_execute_command(self, code_file: str) -> str:
+        """获取执行命令"""
+        pass
+
+class PythonLanguage(Language):
+    def get_docker_image(self) -> str:
+        return 'python:3.8-slim'
+
+    def get_execute_command(self, code_file: str) -> str:
+        return f'python {code_file}'
+```
+
+*插件系统*（V2.0）:
+- **插件类型**：
+  - 题型插件：新题型
+  - 语言插件：新语言
+  - 评判插件：新评判方式
+  - UI插件：新UI组件
+- **插件接口**：
+```python
+class Plugin(ABC):
+    """插件基类"""
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """获取插件名称"""
+        pass
+
+    @abstractmethod
+    def get_version(self) -> str:
+        """获取插件版本"""
+        pass
+
+    @abstractmethod
+    def install(self) -> bool:
+        """安装插件"""
+        pass
+
+    @abstractmethod
+    def uninstall(self) -> bool:
+        """卸载插件"""
+        pass
+```
+
+*第三方集成*:
+- **OAuth登录**（V1.0）：
+  - 支持：GitHub、Google、微信
+  - 协议：OAuth 2.0
+  - 库：Authlib
+- **LMS集成**（V2.0）：
+  - 支持：Moodle、Canvas、Blackboard
+  - 协议：LTI 1.3
+  - 功能：单点登录、成绩同步
 
 **数据扩展**:
 - ✅ 支持数据库迁移（SQLite→MySQL→PostgreSQL）
@@ -3171,38 +5422,373 @@ Docker环境 → F3 ↗
 - ✅ 支持缓存系统（Redis）
 - ✅ 支持消息队列（Celery + Redis）
 
+**详细数据扩展设计**:
+
+*数据库迁移*:
+- **SQLite**（MVP）：
+  - 优点：零配置、轻量级
+  - 缺点：并发性能差、不支持集群
+  - 适用：<500用户
+- **MySQL**（V1.0）：
+  - 优点：高性能、高并发
+  - 缺点：需要配置、占用资源
+  - 适用：500-10000用户
+- **PostgreSQL**（V2.0）：
+  - 优点：功能强大、支持JSON
+  - 缺点：配置复杂
+  - 适用：>10000用户
+
+*迁移步骤*:
+```bash
+# 1. 导出SQLite数据
+sqlite3 pythonlearn.db .dump > backup.sql
+
+# 2. 转换SQL语法（SQLite → MySQL）
+sed 's/AUTOINCREMENT/AUTO_INCREMENT/g' backup.sql > mysql_backup.sql
+
+# 3. 导入MySQL
+mysql -u root -p pythonlearn < mysql_backup.sql
+
+# 4. 更新配置
+# DATABASE_URL=mysql://user:pass@localhost/pythonlearn
+```
+
+*缓存系统*:
+- **缓存内容**：
+  - 题目列表（TTL: 5分钟）
+  - 题目详情（TTL: 10分钟）
+  - 用户信息（TTL: 30分钟）
+  - 班级信息（TTL: 10分钟）
+- **缓存策略**：
+  - Cache-Aside：先查缓存，未命中查数据库，写入缓存
+  - Write-Through：写数据库同时写缓存
+  - 过期策略：LRU（最近最少使用）
+- **缓存示例**：
+```python
+def get_problem(problem_id: int) -> Problem:
+    # 先查缓存
+    cache_key = f'problem:{problem_id}'
+    cached = redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # 查数据库
+    problem = db.query(Problem).get(problem_id)
+
+    # 写入缓存
+    redis.setex(cache_key, 600, json.dumps(problem))
+
+    return problem
+```
+
+*消息队列*:
+- **队列类型**：
+  - 代码执行队列：高优先级
+  - 邮件发送队列：低优先级
+  - 数据统计队列：低优先级
+- **任务示例**：
+```python
+@celery.task
+def execute_code_task(submission_id: int):
+    """异步执行代码"""
+    submission = db.query(Submission).get(submission_id)
+    result = execute_code(submission.code)
+    submission.status = result['status']
+    submission.output = result['output']
+    db.commit()
+```
+
 **部署扩展**:
 - ✅ 支持单机部署（Docker Compose）
 - ✅ 支持集群部署（Kubernetes，未来）
 - ✅ 支持云部署（AWS、阿里云，未来）
 - ✅ 支持混合部署（本地+云端，未来）
 
+**详细部署扩展设计**:
+
+*单机部署*（MVP）:
+- **部署方式**：Docker Compose
+- **服务组成**：
+  - Web服务（Flask）
+  - 数据库（SQLite/MySQL）
+  - 缓存（Redis）
+  - 任务队列（Celery）
+- **配置文件**：docker-compose.yml
+- **启动命令**：`docker-compose up -d`
+
+*集群部署*（V2.0）:
+- **部署方式**：Kubernetes
+- **服务组成**：
+  - Web服务（多副本）
+  - 数据库（主从复制）
+  - 缓存（Redis Cluster）
+  - 任务队列（Celery + RabbitMQ）
+  - 负载均衡（Nginx Ingress）
+- **扩容策略**：
+  - 水平扩容：增加Web服务副本
+  - 垂直扩容：增加单个服务资源
+  - 自动扩容：基于CPU/内存使用率
+
+*云部署*（未来）:
+- **AWS**：
+  - 计算：EC2、ECS、Lambda
+  - 数据库：RDS（MySQL/PostgreSQL）
+  - 缓存：ElastiCache（Redis）
+  - 存储：S3
+  - CDN：CloudFront
+- **阿里云**：
+  - 计算：ECS、容器服务
+  - 数据库：RDS
+  - 缓存：Redis
+  - 存储：OSS
+  - CDN：CDN
+
+*混合部署*（未来）:
+- **本地**：
+  - Web服务
+  - 数据库
+  - 缓存
+- **云端**：
+  - 代码执行（弹性扩容）
+  - 文件存储（OSS）
+  - CDN加速
+
 ### 6.6 兼容性需求
 
 **浏览器兼容**:
 
-| 浏览器 | 最低版本 | 支持程度 | 测试覆盖 |
-|--------|---------|---------|---------|
-| **Chrome** | 90+ | 完全支持 | 100% |
-| **Firefox** | 88+ | 完全支持 | 100% |
-| **Safari** | 14+ | 完全支持 | 80% |
-| **Edge** | 90+ | 完全支持 | 80% |
-| **IE** | 不支持 | - | - |
+| 浏览器 | 最低版本 | 支持程度 | 测试覆盖 | 已知问题 |
+|--------|---------|---------|---------|---------|
+| **Chrome** | 90+ | 完全支持 | 100% | 无 |
+| **Firefox** | 88+ | 完全支持 | 100% | 无 |
+| **Safari** | 14+ | 完全支持 | 80% | 部分CSS效果不一致 |
+| **Edge** | 90+ | 完全支持 | 80% | 无 |
+| **IE** | 不支持 | - | - | 不支持ES6+ |
+
+**详细浏览器兼容性**:
+
+*Chrome（推荐）*:
+- **版本要求**：90+（2021年4月发布）
+- **支持特性**：
+  - ES6+语法
+  - CSS Grid、Flexbox
+  - WebSocket
+  - LocalStorage
+  - Service Worker
+- **测试版本**：90、100、110、最新版
+- **测试工具**：Chrome DevTools
+
+*Firefox*:
+- **版本要求**：88+（2021年4月发布）
+- **支持特性**：同Chrome
+- **测试版本**：88、100、110、最新版
+- **已知问题**：
+  - 部分CSS动画性能略差
+  - 字体渲染略有差异
+
+*Safari*:
+- **版本要求**：14+（2020年9月发布）
+- **支持特性**：同Chrome
+- **测试版本**：14、15、16、最新版
+- **已知问题**：
+  - 部分CSS效果不一致（如backdrop-filter）
+  - WebSocket连接偶尔不稳定
+  - 需要添加-webkit-前缀
+
+*Edge*:
+- **版本要求**：90+（基于Chromium）
+- **支持特性**：同Chrome
+- **测试版本**：90、100、110、最新版
+- **已知问题**：无
+
+*IE（不支持）*:
+- **原因**：
+  - 不支持ES6+语法
+  - 不支持CSS Grid
+  - 性能差
+  - 微软已停止支持
+- **提示**：访问时显示"请使用现代浏览器（Chrome、Firefox、Safari、Edge）"
+
+*浏览器特性检测*:
+```javascript
+// 检测必需特性
+const requiredFeatures = {
+  localStorage: typeof Storage !== 'undefined',
+  webSocket: typeof WebSocket !== 'undefined',
+  es6: typeof Symbol !== 'undefined',
+  fetch: typeof fetch !== 'undefined'
+};
+
+// 如果不支持，显示提示
+if (!Object.values(requiredFeatures).every(v => v)) {
+  alert('您的浏览器版本过低，请升级到最新版本');
+}
+```
 
 **操作系统兼容**:
 
-| 操作系统 | 最低版本 | 支持程度 | 测试覆盖 |
-|---------|---------|---------|---------|
-| **macOS** | 10.15+ | 完全支持 | 100% |
-| **Windows** | 10+ | 完全支持 | 100% |
-| **Linux** | Ubuntu 20.04+ | 完全支持 | 80% |
+| 操作系统 | 最低版本 | 支持程度 | 测试覆盖 | 部署方式 |
+|---------|---------|---------|---------|---------|
+| **macOS** | 10.15+ | 完全支持 | 100% | Docker Desktop |
+| **Windows** | 10+ | 完全支持 | 100% | Docker Desktop |
+| **Linux** | Ubuntu 20.04+ | 完全支持 | 80% | Docker Engine |
+
+**详细操作系统兼容性**:
+
+*macOS*:
+- **版本要求**：10.15 Catalina+
+- **Docker版本**：Docker Desktop 4.0+
+- **测试版本**：
+  - macOS 10.15 Catalina
+  - macOS 11 Big Sur
+  - macOS 12 Monterey
+  - macOS 13 Ventura
+  - macOS 14 Sonoma
+- **安装步骤**：
+  1. 安装Docker Desktop
+  2. 下载docker-compose.yml
+  3. 运行`docker-compose up -d`
+  4. 访问http://localhost:5000
+
+*Windows*:
+- **版本要求**：Windows 10 1903+（支持WSL 2）
+- **Docker版本**：Docker Desktop 4.0+
+- **测试版本**：
+  - Windows 10 21H2
+  - Windows 11 21H2
+  - Windows 11 22H2
+- **安装步骤**：
+  1. 启用WSL 2
+  2. 安装Docker Desktop
+  3. 下载docker-compose.yml
+  4. 运行`docker-compose up -d`
+  5. 访问http://localhost:5000
+- **已知问题**：
+  - WSL 2性能略低于原生Linux
+  - 文件权限问题（需要配置）
+
+*Linux*:
+- **发行版支持**：
+  - Ubuntu 20.04+（推荐）
+  - Debian 10+
+  - CentOS 8+
+  - Fedora 33+
+- **Docker版本**：Docker Engine 20.10+
+- **测试版本**：
+  - Ubuntu 20.04 LTS
+  - Ubuntu 22.04 LTS
+- **安装步骤**：
+  1. 安装Docker Engine
+  2. 安装Docker Compose
+  3. 下载docker-compose.yml
+  4. 运行`docker-compose up -d`
+  5. 访问http://localhost:5000
 
 **移动设备兼容**:
 
-| 设备 | 支持程度 | 说明 |
-|------|---------|------|
-| **平板（iPad）** | 部分支持 | 屏幕宽度 ≥768px |
-| **手机** | 不支持 | 屏幕太小，代码编辑体验差 |
+| 设备 | 支持程度 | 说明 | 屏幕宽度 |
+|------|---------|------|---------|
+| **平板（iPad）** | 部分支持 | 可浏览题目、查看统计，代码编辑体验一般 | ≥768px |
+| **平板（Android）** | 部分支持 | 同iPad | ≥768px |
+| **手机** | 不支持 | 屏幕太小，代码编辑体验差 | <768px |
+
+**详细移动设备兼容性**:
+
+*iPad*:
+- **支持版本**：iPadOS 14+
+- **支持功能**：
+  - ✅ 浏览题目列表
+  - ✅ 查看题目详情
+  - ✅ 查看作业统计
+  - ✅ 查看班级信息
+  - ⚠️ 代码编辑（体验一般，建议使用外接键盘）
+  - ❌ 代码执行（功能正常，但输入不便）
+- **测试设备**：
+  - iPad Pro 12.9"（2048×2732）
+  - iPad Air 10.9"（1640×2360）
+  - iPad 10.2"（1620×2160）
+- **优化建议**：
+  - 使用外接键盘
+  - 横屏使用
+  - 使用Safari浏览器
+
+*Android平板*:
+- **支持版本**：Android 10+
+- **支持功能**：同iPad
+- **测试设备**：
+  - Samsung Galaxy Tab S7（1752×2800）
+  - Huawei MatePad Pro（1600×2560）
+- **已知问题**：
+  - 部分Android浏览器兼容性差
+  - 建议使用Chrome浏览器
+
+*手机（不支持）*:
+- **原因**：
+  - 屏幕太小（<768px）
+  - 代码编辑体验差
+  - 虚拟键盘占用空间大
+- **提示**：访问时显示"请使用电脑或平板访问"
+- **未来计划**：
+  - V2.0：开发移动端App（React Native）
+  - 支持：浏览题目、查看统计、简单代码编辑
+
+**响应式设计断点**:
+
+| 断点 | 屏幕宽度 | 设备类型 | 布局 |
+|------|---------|---------|------|
+| **xs** | <576px | 手机 | 不支持 |
+| **sm** | 576px-768px | 手机（横屏） | 不支持 |
+| **md** | 768px-992px | 平板 | 单列布局 |
+| **lg** | 992px-1200px | 小屏电脑 | 双列布局 |
+| **xl** | 1200px-1920px | 普通电脑 | 双列布局 |
+| **xxl** | >1920px | 大屏电脑 | 三列布局 |
+
+**屏幕分辨率支持**:
+
+| 分辨率 | 设备 | 支持程度 | 测试覆盖 |
+|--------|------|---------|---------|
+| **1920×1080** | 普通电脑 | 完全支持 | 100% |
+| **1366×768** | 笔记本 | 完全支持 | 100% |
+| **2560×1440** | 2K显示器 | 完全支持 | 80% |
+| **3840×2160** | 4K显示器 | 完全支持 | 60% |
+| **1024×768** | 老旧设备 | 部分支持 | 40% |
+
+**兼容性测试策略**:
+
+*测试工具*:
+- **浏览器测试**：BrowserStack、Sauce Labs
+- **响应式测试**：Chrome DevTools Device Mode
+- **性能测试**：Lighthouse
+- **可访问性测试**：axe DevTools
+
+*测试矩阵*:
+- **优先级P0**（必须测试）：
+  - Chrome 最新版 + Windows 10
+  - Chrome 最新版 + macOS
+  - Firefox 最新版 + Windows 10
+- **优先级P1**（重要测试）：
+  - Safari 最新版 + macOS
+  - Edge 最新版 + Windows 10
+  - Chrome 最新版 + Ubuntu
+- **优先级P2**（可选测试）：
+  - Safari + iPad
+  - Chrome + Android平板
+
+*测试用例*:
+- **功能测试**：
+  - 用户注册登录
+  - 题目浏览和搜索
+  - 代码编辑和执行
+  - 作业提交和查看
+- **兼容性测试**：
+  - 页面布局正常
+  - 交互功能正常
+  - 样式显示正常
+  - 性能符合要求
+- **回归测试**：
+  - 每次发布前执行
+  - 覆盖核心功能
+  - 覆盖主要浏览器
 
 ---
 
