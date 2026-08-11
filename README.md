@@ -1,3 +1,5 @@
+
+
 # 🐍 Python 学习项目 - 从入门到精通
 
 <div align="center">
@@ -94,8 +96,8 @@
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/yourusername/pythonLearn.git
-cd pythonLearn
+git clone https://github.com/artskiller/PythonOnlineQASystem.git
+cd PythonOnlineQASystem
 ```
 
 ### 2. 环境设置（2 分钟）
